@@ -7,17 +7,20 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { CreateIssueSchema, type CreateIssueInput } from "@/lib/issues/validators";
 import { createIssue } from "@/lib/issues/actions";
+import { AttachmentField } from "./AttachmentField";
 
 /**
  * Client-side create form. The Zod resolver keeps the UX-side check aligned
  * with the server contract — the server re-validates because "client-side
  * check is a convenience rather than a guarantee" (PRD).
  *
- * Attachments (Phase 3) will be a sibling field in the same form.
+ * Phase 3: `AttachmentField` sits alongside the text fields. Files travel
+ * as `attachment[]` FormData entries.
  */
 export function CreateIssueForm() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
   const {
     register,
     handleSubmit,
@@ -33,11 +36,29 @@ export function CreateIssueForm() {
     const fd = new FormData();
     fd.set("title", values.title);
     fd.set("description", values.description);
+    for (const file of files) {
+      fd.append("attachment[]", file);
+    }
     const res = await createIssue(fd);
     if (!res.ok) {
       setSubmitting(false);
+      if (res.reason === "attachment_rejected") {
+        toast.error(
+          `Załączniki odrzucone: ${res.rejected
+            .map((r) => `${r.name} — ${r.message}`)
+            .join("; ")}`,
+        );
+        return;
+      }
       toast.error("Nie udało się utworzyć zgłoszenia. Sprawdź formularz.");
       return;
+    }
+    if (res.rejected && res.rejected.length > 0) {
+      toast.warning(
+        `Część załączników pominięto: ${res.rejected
+          .map((r) => `${r.name} — ${r.message}`)
+          .join("; ")}`,
+      );
     }
     // Land on the new issue's detail page. `router.refresh()` isn't needed
     // here — we're navigating to a new server-rendered route.
@@ -84,6 +105,8 @@ export function CreateIssueForm() {
           Co robiłeś, czego się spodziewałeś, co się stało zamiast tego (do 5000 znaków).
         </p>
       </div>
+
+      <AttachmentField onChange={setFiles} disabled={submitting} />
 
       <div className="row" style={{ justifyContent: "flex-end" }}>
         <button type="submit" className="btn btn-primary" disabled={submitting}>

@@ -4,6 +4,7 @@ import { getMyIssue } from "@/lib/dal";
 import { IssueIdSchema } from "@/lib/issues/validators";
 import { StatusBadge } from "../_components/StatusBadge";
 import { IssueFeed } from "../_components/IssueFeed";
+import { Screenshots } from "../_components/Screenshots";
 import { formatDateTime } from "../_components/formatDateTime";
 
 export default async function ReporterIssueDetailPage(props: {
@@ -41,6 +42,8 @@ export default async function ReporterIssueDetailPage(props: {
         <h2 style={{ marginTop: 0 }}>Opis</h2>
         <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{issue.description}</p>
       </section>
+
+      <Screenshots attachments={issue.attachments} />
 
       <section className="stack">
         <h2>Aktywność</h2>

@@ -168,3 +168,57 @@ export const getMyIssue = cache(
     });
   },
 );
+
+/**
+ * Attachment gate — the DAL half of `/api/attachments/[id]`. Runs the
+ * same admin-OR-reporter predicate as `getMyIssue`; on any miss
+ * (nonexistent id, wrong owner, non-admin) returns `null` so the route
+ * handler can render a plain 404 without leaking existence.
+ *
+ * We deliberately do **not** call `notFound()` here — the caller is a
+ * Route Handler, which returns a `Response` rather than throwing render
+ * control back up. Route Handlers can call `notFound()` too, but a
+ * plain `null` keeps this function usable from tests without a Next.js
+ * dispatcher.
+ */
+export type AttachmentForServe = {
+  id: string;
+  issueId: string;
+  blobUrl: string;
+  blobPathname: string;
+  contentType: string;
+  filename: string;
+};
+
+export const getAttachmentForCurrentUser = cache(
+  async (id: string): Promise<AttachmentForServe | null> => {
+    const me = await requireUser();
+
+    const [row] = await db
+      .select({
+        id: issueAttachments.id,
+        issueId: issueAttachments.issueId,
+        blobUrl: issueAttachments.blobUrl,
+        blobPathname: issueAttachments.blobPathname,
+        contentType: issueAttachments.contentType,
+        filename: issueAttachments.filename,
+        reporterId: issues.reporterId,
+      })
+      .from(issueAttachments)
+      .innerJoin(issues, eq(issues.id, issueAttachments.issueId))
+      .where(eq(issueAttachments.id, id))
+      .limit(1);
+
+    if (!row) return null;
+    if (me.role !== "admin" && row.reporterId !== me.id) return null;
+
+    return {
+      id: row.id,
+      issueId: row.issueId,
+      blobUrl: row.blobUrl,
+      blobPathname: row.blobPathname,
+      contentType: row.contentType,
+      filename: row.filename,
+    };
+  },
+);

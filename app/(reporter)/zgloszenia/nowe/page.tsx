@@ -10,8 +10,8 @@ export default function NewIssuePage() {
         </p>
         <h1 style={{ marginTop: 8 }}>Nowe zgłoszenie</h1>
         <p className="muted">
-          Opisz problem możliwie krótko i konkretnie. Załączniki dodasz w
-          następnym kroku (dostępne wkrótce).
+          Opisz problem możliwie krótko i konkretnie. Dodaj zrzuty ekranu,
+          jeśli pomogą zrozumieć, co się stało.
         </p>
       </div>
       <div className="card">
