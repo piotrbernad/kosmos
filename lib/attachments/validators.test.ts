@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   MAX_ATTACHMENTS_PER_ISSUE,
   MAX_BYTES_PER_ATTACHMENT,
+  MAX_TOTAL_BYTES_PER_SUBMISSION,
   validateAttachments,
   extensionForContentType,
   makeAttachmentKey,
@@ -37,7 +38,7 @@ describe("validateAttachments", () => {
     expect(r.rejected[0]?.why).toBe("bad_type");
   });
 
-  it("rejects an 11 MB file with reason too_large", () => {
+  it("rejects a file one byte over the per-file limit with reason too_large", () => {
     const r = validateAttachments([
       f("big.png", "image/png", MAX_BYTES_PER_ATTACHMENT + 1),
     ]);
@@ -45,11 +46,33 @@ describe("validateAttachments", () => {
     expect(r.rejected[0]?.why).toBe("too_large");
   });
 
-  it("accepts a file exactly at the 10 MB boundary", () => {
+  it("accepts a file exactly at the per-file boundary", () => {
     const r = validateAttachments([
       f("edge.png", "image/png", MAX_BYTES_PER_ATTACHMENT),
     ]);
     expect(r.accepted).toHaveLength(1);
+  });
+
+  it("rejects a file that would push the batch over the total-bytes cap", () => {
+    // Two files each just over half the total cap: the first fits, the
+    // second pushes the running total over the limit and is rejected.
+    const half = Math.floor(MAX_TOTAL_BYTES_PER_SUBMISSION / 2) + 1;
+    const r = validateAttachments([
+      f("a.png", "image/png", half),
+      f("b.png", "image/png", half),
+    ]);
+    expect(r.accepted.map((x) => x.name)).toEqual(["a.png"]);
+    expect(r.rejected.map((x) => x.why)).toEqual(["total_too_large"]);
+  });
+
+  it("accepts a batch whose total sits exactly at the total-bytes cap", () => {
+    const half = Math.floor(MAX_TOTAL_BYTES_PER_SUBMISSION / 2);
+    const r = validateAttachments([
+      f("a.png", "image/png", half),
+      f("b.png", "image/png", MAX_TOTAL_BYTES_PER_SUBMISSION - half),
+    ]);
+    expect(r.accepted).toHaveLength(2);
+    expect(r.rejected).toHaveLength(0);
   });
 
   it("accepts the first N files up to the cap and rejects the rest as too_many", () => {
