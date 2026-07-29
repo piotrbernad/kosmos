@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   MAX_ATTACHMENTS_PER_ISSUE,
   MAX_BYTES_PER_ATTACHMENT,
+  MAX_TOTAL_BYTES_PER_SUBMISSION,
   validateAttachments,
   ALLOWED_CONTENT_TYPES,
 } from "@/lib/attachments/validators";
@@ -30,6 +31,7 @@ export type AttachmentFieldProps = {
 
 const ALLOWED_ACCEPT = ALLOWED_CONTENT_TYPES.join(",");
 const MB = MAX_BYTES_PER_ATTACHMENT / (1024 * 1024);
+const TOTAL_MB = MAX_TOTAL_BYTES_PER_SUBMISSION / (1024 * 1024);
 
 function humanSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -44,6 +46,8 @@ export function AttachmentField({ onChange, disabled }: AttachmentFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const remaining = MAX_ATTACHMENTS_PER_ISSUE - entries.length;
+  const totalBytes = entries.reduce((sum, e) => sum + e.file.size, 0);
+  const totalMbUsed = totalBytes / (1024 * 1024);
 
   useEffect(() => {
     onChange(entries.map((e) => e.file));
@@ -121,8 +125,17 @@ export function AttachmentField({ onChange, disabled }: AttachmentFieldProps) {
       <label htmlFor="attachment-input">Załączniki</label>
       <p className="muted" style={{ margin: 0, fontSize: 12 }}>
         Do {MAX_ATTACHMENTS_PER_ISSUE} obrazów (PNG, JPG, WebP, GIF), maks.{" "}
-        {MB} MB każdy. Przeciągnij pliki lub wybierz z dysku.
+        {MB} MB każdy i {TOTAL_MB} MB łącznie. Przeciągnij pliki lub wybierz z dysku.
       </p>
+      {entries.length > 0 && (
+        <p
+          className="muted"
+          style={{ margin: 0, fontSize: 11 }}
+          data-testid="attachment-total"
+        >
+          Wykorzystano {totalMbUsed.toFixed(1)} MB z {TOTAL_MB} MB.
+        </p>
+      )}
 
       <div
         className={zoneClass}

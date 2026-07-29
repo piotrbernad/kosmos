@@ -142,7 +142,8 @@ test("rejects a 6th image, an 11 MB image, and a PDF while keeping the good ones
       .getByLabel("Opis")
       .fill("Kilka poprawnych, kilka do odrzucenia.");
 
-    // 11 MB blob — buffer of one byte over the 10 MB cap.
+    // Comfortably over the per-file cap (4 MB) to exercise the `too_large`
+    // rejection path.
     const oversize = Buffer.alloc(10 * 1024 * 1024 + 1, 0);
 
     // Attach 5 good + a PDF + an oversize + a 6th good image.

@@ -11,7 +11,14 @@
  */
 
 export const MAX_ATTACHMENTS_PER_ISSUE = 5;
-export const MAX_BYTES_PER_ATTACHMENT = 10 * 1024 * 1024; // 10 MB
+// Per-file limit. Sized to fit inside Vercel's Function request body cap
+// (~4.5 MB) so a single-file submission never trips the platform 413. If we
+// later need larger uploads, the fix is direct-to-Blob client uploads, not
+// bumping this constant past ~4 MB.
+export const MAX_BYTES_PER_ATTACHMENT = 4 * 1024 * 1024; // 4 MB
+// Sum of all files in one create/edit submission. Same platform reasoning as
+// above — everything that hits the Server Action shares one request body.
+export const MAX_TOTAL_BYTES_PER_SUBMISSION = 4 * 1024 * 1024; // 4 MB
 
 // Note: browsers report `image/jpeg` for both `.jpg` and `.jpeg`.
 export const ALLOWED_CONTENT_TYPES = [
@@ -26,6 +33,7 @@ export type AllowedContentType = (typeof ALLOWED_CONTENT_TYPES)[number];
 export type RejectionReason =
   | "too_many"
   | "too_large"
+  | "total_too_large"
   | "bad_type"
   | "empty";
 
@@ -47,6 +55,10 @@ export function reasonMessage(why: RejectionReason): string {
       return `Można dodać maksymalnie ${MAX_ATTACHMENTS_PER_ISSUE} załączników.`;
     case "too_large":
       return `Plik jest większy niż ${MAX_BYTES_PER_ATTACHMENT / (1024 * 1024)} MB.`;
+    case "total_too_large":
+      return `Łączny rozmiar załączników przekracza ${
+        MAX_TOTAL_BYTES_PER_SUBMISSION / (1024 * 1024)
+      } MB.`;
     case "bad_type":
       return "Dozwolone są tylko obrazy PNG, JPG, WebP lub GIF.";
     case "empty":
@@ -76,7 +88,11 @@ export function validateAttachments<T extends FileLike>(
   const accepted: T[] = [];
   const rejected: ValidationResult<T>["rejected"] = [];
 
-  let running = existingCount;
+  let runningCount = existingCount;
+  // Total-bytes budget applies to *this batch only*, because only files in
+  // this batch travel in the Server Action request body. Existing (already
+  // uploaded) attachments do not contribute — they live on Blob.
+  let runningBytes = 0;
 
   for (const f of files) {
     const name = f.name || "(bez nazwy)";
@@ -93,13 +109,22 @@ export function validateAttachments<T extends FileLike>(
       rejected.push({ name, why: "too_large", message: reasonMessage("too_large") });
       continue;
     }
-    if (running >= MAX_ATTACHMENTS_PER_ISSUE) {
+    if (runningCount >= MAX_ATTACHMENTS_PER_ISSUE) {
       rejected.push({ name, why: "too_many", message: reasonMessage("too_many") });
+      continue;
+    }
+    if (runningBytes + f.size > MAX_TOTAL_BYTES_PER_SUBMISSION) {
+      rejected.push({
+        name,
+        why: "total_too_large",
+        message: reasonMessage("total_too_large"),
+      });
       continue;
     }
 
     accepted.push(f);
-    running += 1;
+    runningCount += 1;
+    runningBytes += f.size;
   }
 
   return { accepted, rejected };
