@@ -37,3 +37,17 @@ next-env.d.ts
 
 # humanlayer
 .humanlayer/workspace.local.json
+
+# Riptide artifacts (cloud-synced)
+.humanlayer/tasks/
+
+# drizzle
+drizzle/meta
+
+# playwright / vitest
+/playwright-report
+/test-results
+/e2e/.auth
+
+# local blob-storage fallback (used when BLOB_READ_WRITE_TOKEN is not set)
+/.blob-storage
