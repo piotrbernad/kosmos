@@ -52,11 +52,12 @@ export function Screenshots({
                   alt={a.filename}
                   loading="lazy"
                   style={{
-                    width: 180,
-                    height: 120,
+                    width: 170,
+                    height: 114,
                     objectFit: "cover",
-                    borderRadius: 6,
-                    border: "1px solid var(--border, #e5e5e5)",
+                    borderRadius: 18,
+                    background: "#e2d7c2",
+                    cursor: "zoom-in",
                   }}
                 />
               </a>

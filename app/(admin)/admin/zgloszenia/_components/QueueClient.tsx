@@ -36,11 +36,10 @@ export function QueueClient({
   return (
     <ResolutionDialogProvider>
       <div
-        className="row"
+        className="queue-switch"
         role="tablist"
         aria-label="Widok kolejki"
         data-testid="queue-view-switcher"
-        style={{ gap: 4, padding: 4, background: "#f1f5f9", borderRadius: 8, width: "fit-content" }}
       >
         <ViewTab active={view === "tablica"} onClick={() => switchView("tablica")}>
           Tablica
@@ -80,15 +79,7 @@ function ViewTab({
       aria-selected={active}
       type="button"
       onClick={onClick}
-      className="btn"
       data-testid={`view-tab-${active ? "active" : "inactive"}`}
-      style={{
-        padding: "6px 12px",
-        border: "none",
-        background: active ? "#fff" : "transparent",
-        boxShadow: active ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
-        fontWeight: active ? 600 : 500,
-      }}
     >
       {children}
     </button>

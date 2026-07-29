@@ -22,10 +22,10 @@ export function IssueFeed({ events }: { events: IssueFeedEvent[] }) {
     <ol
       className="stack"
       data-testid="issue-feed"
-      style={{ listStyle: "none", padding: 0, margin: 0 }}
+      style={{ listStyle: "none", padding: 0, margin: 0, gap: 10 }}
     >
       {events.map((e) => (
-        <li key={e.id} data-testid={`feed-event-${e.kind}`} className="card" style={{ padding: 12 }}>
+        <li key={e.id} data-testid={`feed-event-${e.kind}`}>
           <FeedEntry event={e} />
         </li>
       ))}
@@ -34,51 +34,54 @@ export function IssueFeed({ events }: { events: IssueFeedEvent[] }) {
 }
 
 function FeedEntry({ event }: { event: IssueFeedEvent }) {
-  const meta = (
-    <p className="muted" style={{ margin: 0, fontSize: 12 }}>
-      {event.actor.name} · {formatDateTime(event.createdAt)}
-    </p>
-  );
+  const metaText = `${event.actor.name} · ${formatDateTime(event.createdAt)}`;
 
   switch (event.payload.kind) {
     case "status_change": {
       // Self-transition on creation (from === to === 'nowe') means
-      // "issue was filed". Any other pair is a real move.
+      // "issue was filed". Any other pair is a real move. Both render as a
+      // lightweight inline "system" row rather than a full card.
       const { from, to } = event.payload;
       const isSeed = from === to;
+      const text = isSeed
+        ? "Utworzono zgłoszenie"
+        : `Zmieniono status: ${statusLabel(from)} → ${statusLabel(to)}`;
       return (
-        <div className="stack" style={{ gap: 4 }}>
-          <p style={{ margin: 0 }}>
-            {isSeed
-              ? "Utworzono zgłoszenie."
-              : `Zmieniono status: ${statusLabel(from)} → ${statusLabel(to)}.`}
-          </p>
-          {meta}
+        <div className="feed-system">
+          <span className="dot" aria-hidden="true" />
+          <div className="feed-meta">
+            {text} · {metaText}
+          </div>
         </div>
       );
     }
     case "comment":
       return (
-        <div className="stack" style={{ gap: 6 }}>
-          <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{event.payload.body}</p>
-          {meta}
+        <div className="feed-item">
+          <div className="feed-body" style={{ whiteSpace: "pre-wrap" }}>
+            {event.payload.body}
+          </div>
+          <div className="feed-meta">{metaText}</div>
         </div>
       );
     case "edit":
       return (
-        <div className="stack" style={{ gap: 4 }}>
-          <p style={{ margin: 0 }}>
-            Zaktualizowano zgłoszenie ({event.payload.fields.map(fieldLabel).join(", ")}).
-          </p>
-          {meta}
+        <div className="feed-system">
+          <span className="dot" aria-hidden="true" />
+          <div className="feed-meta">
+            Zaktualizowano zgłoszenie (
+            {event.payload.fields.map(fieldLabel).join(", ")}) · {metaText}
+          </div>
         </div>
       );
     case "resolution":
       return (
-        <div className="stack" style={{ gap: 6 }}>
-          <p style={{ margin: 0, fontWeight: 600 }}>Rozwiązanie</p>
-          <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{event.payload.body}</p>
-          {meta}
+        <div className="feed-resolution">
+          <div className="feed-label">Rozwiązanie</div>
+          <div className="feed-body" style={{ whiteSpace: "pre-wrap" }}>
+            {event.payload.body}
+          </div>
+          <div className="feed-meta">{metaText}</div>
         </div>
       );
   }

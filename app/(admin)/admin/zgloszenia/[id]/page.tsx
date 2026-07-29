@@ -6,6 +6,7 @@ import { IssueFeed } from "@/app/(reporter)/zgloszenia/_components/IssueFeed";
 import { Screenshots } from "@/app/(reporter)/zgloszenia/_components/Screenshots";
 import { formatDateTime } from "@/app/(reporter)/zgloszenia/_components/formatDateTime";
 import { CommentComposer } from "@/app/(reporter)/zgloszenia/_components/CommentComposer";
+import { StatusBadge } from "@/app/(reporter)/zgloszenia/_components/StatusBadge";
 import { StatusPicker } from "../_components/StatusPicker";
 import { ResolutionDialogProvider } from "../_components/ResolutionDialogProvider";
 
@@ -52,8 +53,8 @@ export default async function AdminIssueDetailPage(props: {
               </p>
             </div>
             {isResolved ? (
-              <span className="muted" data-testid="status-terminal-badge">
-                Rozwiązane
+              <span data-testid="status-terminal-badge">
+                <StatusBadge status={issue.status} />
               </span>
             ) : (
               <StatusPicker

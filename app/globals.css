@@ -1,12 +1,63 @@
+/*
+ * Kosmos "zgłoszenia" design system.
+ * Warm cream surfaces, indigo primary, Plus Jakarta Sans, pill buttons and
+ * rounded cards. Ported from the Claude Design mockup (templates/zgloszenia).
+ * The palette lives in CSS variables so components stay token-driven.
+ */
+
 :root {
-  --bg: #f6f7f9;
-  --fg: #0f172a;
-  --muted: #64748b;
-  --card: #ffffff;
-  --border: #e2e8f0;
-  --primary: #0f172a;
-  --primary-fg: #ffffff;
-  --danger: #b91c1c;
+  /* --font-jakarta is injected by next/font in app/layout.tsx */
+  --font-sans: var(--font-jakarta), -apple-system, BlinkMacSystemFont, "Segoe UI",
+    system-ui, sans-serif;
+
+  /* Surfaces */
+  --bg: #f7f1e7; /* page */
+  --surface: #efe6d6; /* cards */
+  --surface-2: #fbf7f0; /* inputs, board cards */
+  --surface-hover: #eae0cd; /* list-row hover */
+
+  /* Text */
+  --fg: #1a1b31; /* headings / strong */
+  --body: #5c574c; /* body copy */
+  --body-2: #3f3b33; /* long-form body */
+  --muted: #8a8272; /* secondary */
+  --muted-2: #7d766a; /* nav idle */
+  --faint: #b3a893; /* arrows, empty */
+
+  /* Borders */
+  --border: #e0d6c6;
+  --border-2: #e2d7c2;
+  --border-3: #e4dac6;
+
+  /* Brand + intents */
+  --primary: #6165b2;
+  --primary-hover: #4e5292;
+  --primary-fg: #fdfdff;
+  --secondary: #e8dfcd; /* secondary button / active nav pill */
+  --secondary-hover: #ded2ba;
+  --accent: #f5b91f; /* underline / in-progress */
+  --danger: #e4675a;
+  --ink: #292b4d; /* admin chip */
+
+  /* Status */
+  --status-new-bg: #6165b2;
+  --status-new-fg: #fdfdff;
+  --status-prog-bg: #f5b91f;
+  --status-prog-fg: #3a2a00;
+  --status-done-bg: #3faa78;
+  --status-done-fg: #ffffff;
+  --status-done-hover: #34946a;
+
+  /* Radii */
+  --r-card: 24px;
+  --r-card-lg: 28px;
+  --r-input: 14px;
+  --r-inner: 18px;
+  --r-pill: 999px;
+
+  /* Back-compat aliases (older components referenced these) */
+  --card: var(--surface);
+  --primary-foreground: var(--primary-fg);
 }
 
 * {
@@ -18,16 +69,27 @@ body {
   margin: 0;
   padding: 0;
   background: var(--bg);
-  color: var(--fg);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  color: var(--body);
+  font-family: var(--font-sans);
   font-size: 15px;
-  line-height: 1.5;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: #e6dcca;
 }
 
 a {
   color: inherit;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
 }
 
 button {
@@ -35,29 +97,35 @@ button {
   font: inherit;
 }
 
-.container {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 32px 24px;
-}
+/* ---------------------------------------------------------------- layout */
 
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 24px;
+.container {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 20px 28px 96px;
 }
 
 .centered-card {
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 56px 24px;
 }
 
 .centered-card .card {
   width: 100%;
-  max-width: 420px;
+  max-width: 452px;
+  border-radius: var(--r-card-lg);
+  padding: 36px;
+}
+
+/* ---------------------------------------------------------------- surfaces */
+
+.card {
+  background: var(--surface);
+  border: none;
+  border-radius: var(--r-card);
+  padding: 26px 28px;
 }
 
 .stack {
@@ -85,51 +153,255 @@ button {
   gap: 12px;
 }
 
+/* ---------------------------------------------------------------- headings */
+
+h1 {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+  margin: 0 0 4px;
+}
+
+h2 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+  margin: 0 0 4px;
+}
+
+/* ---------------------------------------------------------------- forms */
+
 label {
-  font-weight: 500;
+  display: block;
+  font-weight: 700;
   font-size: 14px;
+  color: var(--fg);
 }
 
 input[type="text"],
 input[type="email"],
 input[type="password"],
-textarea {
+input:not([type]),
+textarea,
+select {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #fff;
-  font: inherit;
+  padding: 13px 16px;
+  font-size: 16px;
+  color: var(--fg);
+  background: var(--surface-2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-input);
+  outline: none;
+  transition: border-color 0.18s ease;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input:not([type]),
+select {
+  height: 50px;
+  padding: 0 16px;
+}
+
+textarea {
+  resize: vertical;
+  line-height: 1.6;
 }
 
 input:focus,
-textarea:focus {
-  outline: 2px solid var(--primary);
-  outline-offset: -1px;
+textarea:focus,
+select:focus {
+  border-color: var(--primary);
 }
+
+/* ---------------------------------------------------------------- buttons */
 
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 10px 16px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: #fff;
+  height: 46px;
+  padding: 0 22px;
+  border-radius: var(--r-pill);
+  border: none;
+  background: var(--secondary);
+  color: var(--body);
+  font-size: 15px;
+  font-weight: 700;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.btn:hover {
+  background: var(--secondary-hover);
   color: var(--fg);
-  font-weight: 500;
 }
 
 .btn-primary {
   background: var(--primary);
   color: var(--primary-fg);
-  border-color: var(--primary);
+}
+
+.btn-primary:hover {
+  background: var(--primary-hover);
+  color: var(--primary-fg);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--body);
+  height: 38px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.btn-ghost:hover {
+  background: var(--surface);
+  color: var(--fg);
+}
+
+.btn-sm {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+.btn-success {
+  background: var(--status-done-bg);
+  color: #fff;
+}
+
+.btn-success:hover {
+  background: var(--status-done-hover);
+  color: #fff;
 }
 
 .btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  opacity: 0.35;
+  pointer-events: none;
 }
+
+/* ---------------------------------------------------------------- admin queue */
+
+.queue-switch {
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  background: var(--surface);
+  border-radius: var(--r-pill);
+  width: fit-content;
+}
+
+.queue-switch button {
+  height: auto;
+  padding: 10px 20px;
+  border-radius: var(--r-pill);
+  border: none;
+  background: transparent;
+  color: var(--muted-2);
+  font-size: 14px;
+  font-weight: 600;
+  transition: color 0.18s ease, background 0.18s ease;
+}
+
+.queue-switch button:hover {
+  color: var(--fg);
+  background: transparent;
+}
+
+.queue-switch button[aria-selected="true"] {
+  background: var(--primary);
+  color: var(--primary-fg);
+  font-weight: 700;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.board-col {
+  background: var(--surface);
+  border-radius: var(--r-card);
+  padding: 18px;
+}
+
+.board-col-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 16px;
+}
+
+.board-col-head .col-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--r-pill);
+  flex: none;
+}
+
+.board-col-head .col-dot[data-status="nowe"] {
+  background: var(--status-new-bg);
+}
+.board-col-head .col-dot[data-status="w_trakcie"] {
+  background: var(--status-prog-bg);
+}
+.board-col-head .col-dot[data-status="rozwiazane"] {
+  background: var(--status-done-bg);
+}
+
+.board-col-head .col-label {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.board-col-head .col-count {
+  margin-left: auto;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.board-card {
+  background: var(--surface-2);
+  border-radius: var(--r-inner);
+  padding: 18px;
+  transition: background 0.18s ease;
+}
+
+.board-card:hover {
+  background: #fff;
+}
+
+.board-card .bc-title {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--fg);
+}
+
+.board-card .bc-meta {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.board-card .bc-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+/* ---------------------------------------------------------------- text */
 
 .muted {
   color: var(--muted);
@@ -141,42 +413,271 @@ textarea:focus {
   font-size: 14px;
 }
 
-.nav {
-  background: #fff;
-  border-bottom: 1px solid var(--border);
-  padding: 12px 24px;
+.field-hint {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 8px;
 }
 
-.nav .inner {
-  max-width: 960px;
+/* ---------------------------------------------------------------- app header */
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: var(--bg);
+}
+
+.app-header .inner {
+  max-width: 1160px;
   margin: 0 auto;
+  padding: 0 28px;
+  height: 74px;
   display: flex;
-  gap: 16px;
   align-items: center;
-  justify-content: space-between;
+  gap: 14px;
 }
 
-.nav a {
-  text-decoration: none;
-  padding: 6px 10px;
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.brand-dot {
+  width: 22px;
+  height: 22px;
+  background: var(--primary);
+}
+
+.brand-dot.d1 {
+  border-radius: var(--r-pill);
+}
+.brand-dot.d2 {
   border-radius: 6px;
+  background: var(--danger);
+}
+.brand-dot.d3 {
+  border-radius: 999px 6px 999px 6px;
+  background: var(--status-done-bg);
 }
 
-.nav a:hover {
-  background: #f1f5f9;
+.brand-name {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+
+.brand-sub {
+  font-size: 17px;
+  color: var(--muted);
+}
+
+.nav-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 26px;
+}
+
+.nav-pill {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--muted-2);
+  padding: 9px 16px;
+  border-radius: var(--r-pill);
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.nav-pill:hover {
+  background: var(--surface);
+  color: var(--fg);
+}
+
+.nav-pill.active {
+  font-weight: 700;
+  color: var(--fg);
+  background: var(--secondary);
+}
+
+.header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.role-chip {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--ink);
+  border-radius: var(--r-pill);
+  padding: 5px 12px;
+}
+
+.user-name {
+  font-size: 15px;
+  color: var(--body);
+}
+
+/* ---------------------------------------------------------------- issue list */
+
+.issue-card {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  background: var(--surface);
+  border-radius: var(--r-card);
+  padding: 26px 28px;
+  transition: background 0.18s ease;
+}
+
+.issue-card:hover {
+  background: var(--surface-hover);
+}
+
+.issue-card .title {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--fg);
+}
+
+.issue-card .meta {
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.issue-arrow {
+  font-size: 20px;
+  color: var(--faint);
 }
 
 .empty {
   text-align: center;
-  padding: 48px 24px;
+  padding: 56px;
+  background: var(--surface);
+  border-radius: var(--r-card);
+}
+
+/* ---------------------------------------------------------------- badges */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge[data-status="nowe"] {
+  background: var(--status-new-bg);
+  color: var(--status-new-fg);
+}
+.badge[data-status="w_trakcie"] {
+  background: var(--status-prog-bg);
+  color: var(--status-prog-fg);
+  font-weight: 700;
+}
+.badge[data-status="rozwiazane"] {
+  background: var(--status-done-bg);
+  color: var(--status-done-fg);
+}
+
+/* ---------------------------------------------------------------- feed */
+
+.feed-item {
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 18px 22px;
+}
+
+.feed-item .feed-body {
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--body-2);
+}
+
+.feed-item .feed-meta {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.feed-system {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 22px;
+}
+
+.feed-system .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: #d8ccb8;
+  flex: none;
+}
+
+.feed-system .feed-meta {
+  font-size: 14px;
   color: var(--muted);
 }
 
-h1 {
-  font-size: 24px;
-  margin: 0 0 4px;
+.feed-resolution {
+  background: var(--status-done-bg);
+  border-radius: 20px;
+  padding: 22px 24px;
 }
-h2 {
-  font-size: 18px;
-  margin: 0 0 4px;
+
+.feed-resolution .feed-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: #dcf1e9;
+}
+
+.feed-resolution .feed-body {
+  font-size: 17px;
+  line-height: 1.6;
+  color: #fff;
+  margin-top: 8px;
+}
+
+.feed-resolution .feed-meta {
+  font-size: 13px;
+  color: #cbe9df;
+  margin-top: 10px;
+}
+
+/* ---------------------------------------------------------------- misc */
+
+.section-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.back-link {
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted-2);
+  margin-bottom: 16px;
+  transition: color 0.18s ease;
+}
+
+.back-link:hover {
+  color: var(--fg);
 }

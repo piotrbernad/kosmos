@@ -28,26 +28,28 @@ export function Lista({
 }) {
   if (issues.length === 0) {
     return (
-      <div className="card empty" data-testid="lista-empty">
-        <p>Brak zgłoszeń.</p>
+      <div className="empty" data-testid="lista-empty">
+        <p className="muted" style={{ margin: 0 }}>
+          Brak zgłoszeń
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+    <div className="card" style={{ padding: "8px 8px 12px" }}>
       <table
         data-testid="admin-lista"
-        style={{ width: "100%", borderCollapse: "collapse" }}
+        style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
       >
         <thead>
-          <tr style={{ background: "#f8fafc", textAlign: "left" }}>
-            <Th>Zgłoszenie</Th>
-            <Th>Zgłaszający</Th>
-            <Th>Status</Th>
-            <Th>Utworzono</Th>
-            <Th>Załączniki</Th>
-            <Th style={{ textAlign: "right" }}>Akcje</Th>
+          <tr>
+            <Th style={{ width: "30%" }}>Zgłoszenie</Th>
+            <Th style={{ width: "15%" }}>Zgłaszający</Th>
+            <Th style={{ width: "13%" }}>Status</Th>
+            <Th style={{ width: "15%" }}>Utworzono</Th>
+            <Th style={{ width: "8%" }}>Zał.</Th>
+            <Th style={{ width: "19%", textAlign: "right" }}>Akcje</Th>
           </tr>
         </thead>
         <tbody>
@@ -64,11 +66,11 @@ function Th({ children, style }: { children: React.ReactNode; style?: React.CSSP
   return (
     <th
       style={{
-        padding: "10px 12px",
-        fontSize: 12,
-        fontWeight: 600,
-        color: "#64748b",
-        borderBottom: "1px solid #e2e8f0",
+        padding: "16px 18px",
+        textAlign: "left",
+        fontSize: 13,
+        fontWeight: 700,
+        color: "var(--muted)",
         ...style,
       }}
     >
@@ -99,35 +101,34 @@ function Row({
       data-status={card.status}
       style={{ opacity: isPending ? 0.7 : 1 }}
     >
-      <Td>
+      <Td style={{ fontSize: 16, fontWeight: 700, color: "var(--fg)" }}>
         <Link
           href={`/admin/zgloszenia/${card.id}`}
           data-testid={`lista-row-${card.id}-title`}
-          style={{ textDecoration: "none", color: "inherit", fontWeight: 500 }}
+          style={{ color: "inherit" }}
         >
           {card.title}
         </Link>
       </Td>
-      <Td>{card.reporter.name}</Td>
+      <Td style={{ color: "var(--body)" }}>{card.reporter.name}</Td>
       <Td>
         <StatusBadge status={card.status} />
       </Td>
-      <Td>{formatDateTime(card.createdAt)}</Td>
-      <Td>{card.attachmentCount || "—"}</Td>
+      <Td style={{ color: "var(--muted)" }}>{formatDateTime(card.createdAt)}</Td>
+      <Td style={{ color: "var(--muted)" }}>{card.attachmentCount || "—"}</Td>
       <Td style={{ textAlign: "right" }}>
         {!isResolved ? (
           <div
             className="row"
-            style={{ gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}
+            style={{ gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}
           >
             {card.status === "nowe" && (
               <button
                 type="button"
-                className="btn"
+                className="btn btn-primary btn-sm"
                 data-testid={`lista-row-${card.id}-start`}
                 disabled={isPending}
                 onClick={() => advance(card.id, card.updatedAt, "w_trakcie")}
-                style={{ padding: "4px 10px", fontSize: 13 }}
               >
                 Rozpocznij →
               </button>
@@ -135,22 +136,20 @@ function Row({
             {card.status === "w_trakcie" && (
               <button
                 type="button"
-                className="btn"
+                className="btn btn-sm"
                 data-testid={`lista-row-${card.id}-back`}
                 disabled={isPending}
                 onClick={() => advance(card.id, card.updatedAt, "nowe")}
-                style={{ padding: "4px 10px", fontSize: 13 }}
               >
-                Cofnij do „Nowe”
+                Cofnij
               </button>
             )}
             <button
               type="button"
-              className="btn"
+              className="btn btn-success btn-sm"
               data-testid={`lista-row-${card.id}-resolve`}
               disabled={isPending}
               onClick={() => resolveDialog.open(card.id, card.updatedAt)}
-              style={{ padding: "4px 10px", fontSize: 13 }}
             >
               Rozwiąż
             </button>
@@ -167,8 +166,8 @@ function Td({ children, style }: { children: React.ReactNode; style?: React.CSSP
   return (
     <td
       style={{
-        padding: "10px 12px",
-        borderBottom: "1px solid #f1f5f9",
+        padding: "14px 18px",
+        borderTop: "1.5px solid var(--border-3)",
         fontSize: 14,
         verticalAlign: "middle",
         ...style,

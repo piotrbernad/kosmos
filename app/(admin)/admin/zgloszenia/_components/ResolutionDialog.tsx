@@ -93,7 +93,7 @@ function ResolutionDialogBody({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(15, 23, 42, 0.45)",
+        background: "rgba(26, 27, 49, 0.45)",
         display: "grid",
         placeItems: "center",
         padding: 16,
@@ -108,12 +108,12 @@ function ResolutionDialogBody({
       <div
         className="card"
         style={{
-          background: "#fff",
-          borderRadius: 12,
-          padding: 20,
+          background: "var(--surface-2)",
+          borderRadius: "var(--r-card-lg)",
+          padding: 32,
           maxWidth: 520,
           width: "100%",
-          boxShadow: "0 20px 45px rgba(15, 23, 42, 0.25)",
+          boxShadow: "0 24px 60px rgba(26, 27, 49, 0.25)",
         }}
         onMouseDown={(e) => e.stopPropagation()}
       >
@@ -174,7 +174,7 @@ function ResolutionDialogBody({
             </button>
             <button
               type="submit"
-              className="btn btn-primary"
+              className="btn btn-success"
               disabled={isSubmitting}
               data-testid="resolution-submit"
             >
