@@ -6,6 +6,7 @@ import { StatusBadge } from "../_components/StatusBadge";
 import { IssueFeed } from "../_components/IssueFeed";
 import { Screenshots } from "../_components/Screenshots";
 import { formatDateTime } from "../_components/formatDateTime";
+import { CommentComposer } from "../_components/CommentComposer";
 
 export default async function ReporterIssueDetailPage(props: {
   params: Promise<{ id: string }>;
@@ -48,6 +49,16 @@ export default async function ReporterIssueDetailPage(props: {
       <section className="stack">
         <h2>Aktywność</h2>
         <IssueFeed events={issue.events} />
+      </section>
+
+      <section className="card stack" data-testid="composer-section">
+        {issue.status === "rozwiazane" ? (
+          <p className="muted" data-testid="discussion-closed" style={{ margin: 0 }}>
+            Dyskusja zakończona.
+          </p>
+        ) : (
+          <CommentComposer issueId={issue.id} />
+        )}
       </section>
     </article>
   );

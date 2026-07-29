@@ -67,3 +67,32 @@ export const EventPayloadSchema = z.discriminatedUnion("kind", [
 
 export type EventPayload = z.infer<typeof EventPayloadSchema>;
 export type EventKind = EventPayload["kind"];
+
+/**
+ * Non-resolving status transitions. Zod rejects `rozwiazane` at the type
+ * level — resolution goes through its own action (`resolveIssue`, Phase 5)
+ * so that the "no path to Rozwiązane skips the explanation" rule is a
+ * type-level fact rather than a runtime `if` branch.
+ */
+export const ChangeStatusSchema = z.object({
+  id: IssueIdSchema,
+  to: z.enum(["nowe", "w_trakcie"]),
+  expectedUpdatedAt: z
+    .string({ error: "Brak znacznika czasu aktualizacji." })
+    .min(1, "Brak znacznika czasu aktualizacji."),
+});
+
+export type ChangeStatusInput = z.infer<typeof ChangeStatusSchema>;
+
+/**
+ * Comment payload — text-only per PRD. Kept generous (5000 chars) so a
+ * long clarifying paragraph fits without the reporter chunking it. The
+ * server-action also refuses to append when the issue is `rozwiazane`
+ * ("Dyskusja zakończona"); that guard is in the action, not the schema.
+ */
+export const AddCommentSchema = z.object({
+  issueId: IssueIdSchema,
+  body: trimmed(1, 5000, "Komentarz"),
+});
+
+export type AddCommentInput = z.infer<typeof AddCommentSchema>;

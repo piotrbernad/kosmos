@@ -1,10 +1,18 @@
 "use server";
 
 import type { ZodIssue } from "zod";
-import { requireUser } from "@/lib/dal";
+import { and, eq, ne, sql } from "drizzle-orm";
+import { requireAdmin, requireUser } from "@/lib/dal";
 import { db } from "@/lib/db/client";
 import { issues, issueEvents, issueAttachments } from "@/lib/db/schema";
-import { CreateIssueSchema } from "./validators";
+import type { IssueStatus } from "@/lib/db/schema";
+import {
+  AddCommentSchema,
+  ChangeStatusSchema,
+  CreateIssueSchema,
+  type AddCommentInput,
+  type ChangeStatusInput,
+} from "./validators";
 import {
   validateAttachments,
   type AllowedContentType,
@@ -185,4 +193,144 @@ export async function createIssue(formData: FormData): Promise<CreateIssueResult
       ? rejected.map((r) => ({ name: r.name, message: r.message }))
       : undefined,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4 — non-resolving status changes and comments.
+// ---------------------------------------------------------------------------
+
+export type ChangeStatusResult =
+  | { ok: true; updatedAt: string; from: IssueStatus; to: IssueStatus }
+  | { ok: false; reason: "conflict" | "gone" | "invalid" };
+
+/**
+ * Admin-only. Moves an issue between `nowe` and `w_trakcie`. `rozwiazane`
+ * is unreachable here at the schema level — resolution goes through
+ * `resolveIssue` in Phase 5 so the mandatory comment is a type-level
+ * fact, not a runtime `if`.
+ *
+ * Concurrency: the UPDATE gates on both `updated_at = expected` and
+ * `status <> 'rozwiazane'`. Zero rows means either someone else changed
+ * the issue between the admin's read and their action, or the issue was
+ * concurrently resolved. Either way we report `conflict` and let the
+ * caller `router.refresh()` to re-read.
+ *
+ * The status change and the audit event go in one transaction so the
+ * feed cannot diverge from the row.
+ */
+export async function changeIssueStatus(
+  input: ChangeStatusInput,
+): Promise<ChangeStatusResult> {
+  const parsed = ChangeStatusSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, reason: "invalid" };
+
+  const me = await requireAdmin();
+  const { id, to, expectedUpdatedAt } = parsed.data;
+  const expected = new Date(expectedUpdatedAt);
+  if (Number.isNaN(expected.getTime())) {
+    return { ok: false, reason: "invalid" };
+  }
+
+  return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ status: issues.status })
+      .from(issues)
+      .where(eq(issues.id, id))
+      .limit(1);
+
+    if (!current) return { ok: false, reason: "gone" } as const;
+
+    // Optimistic concurrency check: compare updated_at at millisecond
+    // precision. Postgres stores microseconds, but the client's copy
+    // of the token round-tripped through an ISO string (JSON has no
+    // "timestamp with sub-ms precision"), so a direct `eq` on the raw
+    // column would never match. Truncating both sides via `date_trunc`
+    // keeps the guard meaningful without depending on driver micros.
+    const [row] = await tx
+      .update(issues)
+      .set({ status: to, updatedAt: sql`now()` })
+      .where(
+        and(
+          eq(issues.id, id),
+          sql`date_trunc('milliseconds', ${issues.updatedAt}) = date_trunc('milliseconds', ${expected}::timestamptz)`,
+          ne(issues.status, "rozwiazane"),
+        ),
+      )
+      .returning({ updatedAt: issues.updatedAt, status: issues.status });
+
+    if (!row) return { ok: false, reason: "conflict" } as const;
+
+    // No-op transitions still record an event by design elsewhere in the
+    // codebase (seed row is a self-transition). For an admin's manual
+    // change we treat `to === from` as a no-op and don't clutter the feed.
+    if (current.status !== to) {
+      await tx.insert(issueEvents).values({
+        issueId: id,
+        actorId: me.id,
+        kind: "status_change",
+        payload: { kind: "status_change", from: current.status, to },
+      });
+    }
+
+    return {
+      ok: true as const,
+      updatedAt: row.updatedAt.toISOString(),
+      from: current.status,
+      to: row.status,
+    };
+  });
+}
+
+export type AddCommentResult =
+  | { ok: true; eventId: string }
+  | { ok: false; reason: "closed" | "invalid" | "gone" };
+
+/**
+ * Either side (reporter or admin) can comment while the issue is not
+ * resolved. Reporter callers additionally have to own the issue —
+ * enforced via the same ownership predicate as `getMyIssue`, so a
+ * probe returns `gone` indistinguishably from a missing id.
+ *
+ * Once the issue is `rozwiazane`, comments are refused with `closed`
+ * (PRD: "the composer is replaced by a line saying the discussion is
+ * closed"). Phase 5's resolution flow depends on this guard so a
+ * comment cannot land after resolution wins the race.
+ *
+ * `updated_at` is not bumped for comments — that column is the
+ * optimistic-concurrency token for the issue's own fields (status,
+ * title, description, attachments), not the conversation.
+ */
+export async function addComment(
+  input: AddCommentInput,
+): Promise<AddCommentResult> {
+  const parsed = AddCommentSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, reason: "invalid" };
+
+  const me = await requireUser();
+  const { issueId, body } = parsed.data;
+
+  const ownership =
+    me.role === "admin"
+      ? eq(issues.id, issueId)
+      : and(eq(issues.id, issueId), eq(issues.reporterId, me.id));
+
+  const [current] = await db
+    .select({ status: issues.status })
+    .from(issues)
+    .where(ownership)
+    .limit(1);
+
+  if (!current) return { ok: false, reason: "gone" };
+  if (current.status === "rozwiazane") return { ok: false, reason: "closed" };
+
+  const eventId = crypto.randomUUID();
+  await db.insert(issueEvents).values({
+    id: eventId,
+    issueId,
+    actorId: me.id,
+    kind: "comment",
+    payload: { kind: "comment", body },
+  });
+
+  return { ok: true, eventId };
 }

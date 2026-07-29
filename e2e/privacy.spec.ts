@@ -66,3 +66,34 @@ test("a garbage id renders not-found rather than blowing up", async ({ browser }
     await ctx.close();
   }
 });
+
+test("plain user reaching /admin/zgloszenia gets 404, not 'forbidden'", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext();
+  try {
+    await registerInContext(ctx, "adminprobe");
+    const page = await ctx.newPage();
+    const response = await page.goto("/admin/zgloszenia");
+    expect(response?.status(), "not-found status").toBe(404);
+    await expect(page.locator("body")).not.toContainText(/forbidden|zabroniony/i);
+    // And the admin queue's title should not have leaked.
+    await expect(page.locator("body")).not.toContainText("Wszystkie zgłoszenia");
+  } finally {
+    await ctx.close();
+  }
+});
+
+test("plain user hitting /admin/zgloszenia/<id> gets 404", async ({ browser }) => {
+  const ctx = await browser.newContext();
+  try {
+    await registerInContext(ctx, "adminidprobe");
+    const page = await ctx.newPage();
+    const response = await page.goto(
+      "/admin/zgloszenia/11111111-1111-4111-8111-111111111111",
+    );
+    expect(response?.status()).toBe(404);
+  } finally {
+    await ctx.close();
+  }
+});

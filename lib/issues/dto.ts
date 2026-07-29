@@ -47,6 +47,31 @@ export type IssueDetailForReporter = {
   events: IssueFeedEvent[];
 };
 
+/**
+ * Admin's copy of the detail. Same layout as the reporter's plus a
+ * `reporter` block (drives the `Zgłaszający` row) so the queue's audience
+ * is spelled out on the detail page.
+ */
+export type IssueDetailForAdmin = IssueDetailForReporter & {
+  reporter: { id: string; name: string; email: string };
+};
+
+/**
+ * Compact card used by the admin queue's Board and Lista views. It is a
+ * `IssueListItem` plus who reported it (drives the "reporter" column /
+ * card meta line). Kept flat — no nested `reporter` object — so the
+ * optimistic hook can copy fields around without a spread dance.
+ */
+export type BoardCard = {
+  id: string;
+  title: string;
+  status: IssueStatus;
+  createdAt: string;
+  updatedAt: string;
+  attachmentCount: number;
+  reporter: { id: string; name: string; email: string };
+};
+
 // ---------------------------------------------------------------------------
 // Row shapes we accept as input. Keeping them as narrow, structural types
 // means mappers work equally well with `db.query.*` results and with
@@ -123,6 +148,42 @@ export function toIssueDetailForReporter(
       sizeBytes: a.sizeBytes,
     })),
     events: row.events.map(toFeedEvent),
+  };
+}
+
+/**
+ * Admin detail. Same shape as the reporter's DTO plus a `reporter` block
+ * — the only difference the PRD requires between the two detail pages.
+ */
+export function toIssueDetailForAdmin(
+  row: IssueRowWithChildren & {
+    reporter: { id: string; name: string; email: string };
+  },
+): IssueDetailForAdmin {
+  return {
+    ...toIssueDetailForReporter(row),
+    reporter: row.reporter,
+  };
+}
+
+/**
+ * Board / list card. Includes the reporter block because that column
+ * appears on the admin side of the queue.
+ */
+export function toBoardCard(
+  row: IssueRow & {
+    attachmentCount: number;
+    reporter: { id: string; name: string; email: string };
+  },
+): BoardCard {
+  return {
+    id: row.id,
+    title: row.title,
+    status: row.status,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    attachmentCount: row.attachmentCount,
+    reporter: row.reporter,
   };
 }
 

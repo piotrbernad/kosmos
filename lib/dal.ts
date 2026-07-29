@@ -12,8 +12,12 @@ import {
   user,
 } from "@/lib/db/schema";
 import {
+  toBoardCard,
+  toIssueDetailForAdmin,
   toIssueDetailForReporter,
   toReporterListItem,
+  type BoardCard,
+  type IssueDetailForAdmin,
   type IssueDetailForReporter,
   type IssueListItem,
 } from "@/lib/issues/dto";
@@ -165,6 +169,121 @@ export const getMyIssue = cache(
         createdAt: e.createdAt,
         actor: e.actorId ? { id: e.actorId, name: e.actorName ?? "—" } : null,
       })),
+    });
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Admin surface. Both helpers `requireAdmin()` first so a mis-import from a
+// reporter route 404s instead of leaking data.
+// ---------------------------------------------------------------------------
+
+/**
+ * Full queue for the admin — every reporter's issue, newest first, with
+ * attachment count and the reporter's name/email so the queue's `Zgłaszający`
+ * column has something to show.
+ */
+export const listAllIssues = cache(async (): Promise<BoardCard[]> => {
+  await requireAdmin();
+
+  const rows = await db
+    .select({
+      id: issues.id,
+      title: issues.title,
+      description: issues.description,
+      status: issues.status,
+      createdAt: issues.createdAt,
+      updatedAt: issues.updatedAt,
+      attachmentCount: sql<number>`count(distinct ${issueAttachments.id})::int`,
+      reporterId: user.id,
+      reporterName: user.name,
+      reporterEmail: user.email,
+    })
+    .from(issues)
+    .leftJoin(issueAttachments, eq(issueAttachments.issueId, issues.id))
+    .innerJoin(user, eq(user.id, issues.reporterId))
+    .groupBy(issues.id, user.id, user.name, user.email)
+    .orderBy(desc(issues.createdAt));
+
+  return rows.map((r) =>
+    toBoardCard({
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      status: r.status,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      attachmentCount: r.attachmentCount,
+      reporter: {
+        id: r.reporterId,
+        name: r.reporterName ?? "—",
+        email: r.reporterEmail ?? "",
+      },
+    }),
+  );
+});
+
+/**
+ * Admin-side single-issue read. Unlike `getMyIssue` there is no ownership
+ * filter — the admin sees any issue by id. Still `notFound()` on miss so a
+ * random UUID looks the same as a real one to a probe.
+ */
+export const getAnyIssue = cache(
+  async (id: string): Promise<IssueDetailForAdmin> => {
+    await requireAdmin();
+
+    const row = await db.query.issues.findFirst({
+      where: eq(issues.id, id),
+    });
+    if (!row) notFound();
+
+    const [attachmentRows, eventRows, reporterRows] = await Promise.all([
+      db
+        .select({
+          id: issueAttachments.id,
+          filename: issueAttachments.filename,
+          contentType: issueAttachments.contentType,
+          sizeBytes: issueAttachments.sizeBytes,
+        })
+        .from(issueAttachments)
+        .where(eq(issueAttachments.issueId, row.id)),
+      db
+        .select({
+          id: issueEvents.id,
+          kind: issueEvents.kind,
+          payload: issueEvents.payload,
+          createdAt: issueEvents.createdAt,
+          actorId: user.id,
+          actorName: user.name,
+        })
+        .from(issueEvents)
+        .leftJoin(user, eq(user.id, issueEvents.actorId))
+        .where(eq(issueEvents.issueId, row.id))
+        .orderBy(issueEvents.createdAt),
+      db
+        .select({ id: user.id, name: user.name, email: user.email })
+        .from(user)
+        .where(eq(user.id, row.reporterId))
+        .limit(1),
+    ]);
+
+    const reporter = reporterRows[0] ?? {
+      id: row.reporterId,
+      name: "—",
+      email: "",
+    };
+
+    return toIssueDetailForAdmin({
+      ...row,
+      attachments: attachmentRows,
+      events: eventRows.map((e) => ({
+        id: e.id,
+        kind: e.kind,
+        payload: e.payload,
+        createdAt: e.createdAt,
+        actor: e.actorId ? { id: e.actorId, name: e.actorName ?? "—" } : null,
+      })),
+      reporter,
     });
   },
 );
