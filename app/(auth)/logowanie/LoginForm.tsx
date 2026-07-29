@@ -23,8 +23,17 @@ export function LoginForm({ nextUrl }: { nextUrl?: string }) {
       return;
     }
     // Bounce to the requested next URL if it's a safe same-origin path,
-    // otherwise let the home page route by role.
-    const target = nextUrl && nextUrl.startsWith("/") ? nextUrl : "/";
+    // otherwise let the home page route by role. `startsWith("/")` alone
+    // would accept `//attacker.com` (protocol-relative) and `/\evil.com`
+    // (Chrome and Firefox both normalize the backslash to `/`), so also
+    // reject those explicitly.
+    const target =
+      nextUrl &&
+      nextUrl.startsWith("/") &&
+      !nextUrl.startsWith("//") &&
+      !nextUrl.startsWith("/\\")
+        ? nextUrl
+        : "/";
     router.push(target);
     router.refresh();
   }

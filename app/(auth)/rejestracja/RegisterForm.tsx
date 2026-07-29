@@ -22,8 +22,17 @@ export function RegisterForm({ nextUrl }: { nextUrl?: string }) {
       setPending(false);
       return;
     }
-    // Better Auth auto-signs-in on successful registration.
-    const target = nextUrl && nextUrl.startsWith("/") ? nextUrl : "/zgloszenia";
+    // Better Auth auto-signs-in on successful registration. Reject
+    // protocol-relative (`//attacker.com`) and backslash-prefixed
+    // (`/\evil.com`, which browsers normalize) redirect targets before
+    // handing the value to router.push.
+    const target =
+      nextUrl &&
+      nextUrl.startsWith("/") &&
+      !nextUrl.startsWith("//") &&
+      !nextUrl.startsWith("/\\")
+        ? nextUrl
+        : "/zgloszenia";
     router.push(target);
     router.refresh();
   }

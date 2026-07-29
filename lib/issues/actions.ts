@@ -459,12 +459,10 @@ export async function editIssue(
   }
 
   // Ownership + lock check up front, before we do any blob work.
-  // Admins are not part of the edit path — only the reporter edits.
-  const ownership =
-    me.role === "admin"
-      ? eq(issues.id, id)
-      : and(eq(issues.id, id), eq(issues.reporterId, me.id));
-
+  // Admins are not part of the edit path — only the reporter edits. The
+  // predicate below is unconditionally `reporterId = me.id`, so an admin
+  // hitting this action gets `gone` (the same 404-shaped answer a wrong
+  // owner would get).
   const [current] = await db
     .select({
       status: issues.status,
@@ -472,7 +470,7 @@ export async function editIssue(
       description: issues.description,
     })
     .from(issues)
-    .where(ownership)
+    .where(and(eq(issues.id, id), eq(issues.reporterId, me.id)))
     .limit(1);
 
   if (!current) return { ok: false, reason: "gone" };

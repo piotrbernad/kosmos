@@ -6,7 +6,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db/client";
 import { account } from "@/lib/db/schema";
 import { ClaimSchema, type ClaimInput } from "./validators";
-import { lookupUnusedInvitation, markInvitationUsed } from "./service";
+import { claimUnusedInvitation } from "./service";
 
 /**
  * Result of `claimInvitation`. Success carries the email that was used to
@@ -28,25 +28,31 @@ export type ClaimResult =
  *
  * Steps:
  *   1. Parse input (token + password).
- *   2. Look up an unused, unexpired invitation matching sha256(token).
- *   3. Write the credential:
- *        • If the user already has a `credential` account row (rare, but
- *          the flow supports it), UPDATE its `password`.
- *        • Otherwise, INSERT a new `credential` account row with the hashed
- *          password.
- *      Better Auth's own `setPassword` endpoint requires the caller to be
- *      signed in (`sensitiveSessionMiddleware`), which is impossible for a
- *      first-time invitee. We use Better Auth's `hashPassword` from
- *      `better-auth/crypto` so the hash is 100% compatible with the sign-in
- *      path — same scrypt parameters, same envelope format.
- *   4. Mark the invitation used.
- *   5. Sign the user in via `auth.api.signInEmail`; the `nextCookies()`
+ *   2. Open a transaction that:
+ *        a. Atomically consumes the invitation via `claimUnusedInvitation`
+ *           (a single `UPDATE ... WHERE used_at IS NULL AND expires_at > now()
+ *           RETURNING ...`). Only the winner of a concurrent claim gets a
+ *           row, so double-claims are impossible.
+ *        b. Writes the credential:
+ *             • UPDATE if a `credential` account row already exists.
+ *             • INSERT otherwise.
+ *           Better Auth's own `setPassword` endpoint requires the caller to
+ *           be signed in (`sensitiveSessionMiddleware`), which is impossible
+ *           for a first-time invitee. We use Better Auth's `hashPassword`
+ *           from `better-auth/crypto` so the hash is 100% compatible with
+ *           the sign-in path — same scrypt parameters, same envelope format.
+ *      If the credential write throws, the whole transaction rolls back and
+ *      the invitation is NOT consumed — the invitee can retry with the same
+ *      URL.
+ *   3. Sign the user in via `auth.api.signInEmail`; the `nextCookies()`
  *      plugin (last in the auth plugins list) makes the Set-Cookie stick
  *      on the Server Action response.
  *
  * Failure modes:
  *   • Invalid input shape → `invalid`.
- *   • Anything about the lookup that isn't a straight hit → `expired_or_used`.
+ *   • Anything about the consume that isn't a straight hit (bad token,
+ *     expired, already used, unknown user, lost the concurrent race) →
+ *     `expired_or_used`.
  *   • Anything about auth (bad hash, sign-in mismatch) rethrows to
  *     `app/error.tsx`. Those failures are genuine bugs, not a probe.
  */
@@ -56,42 +62,47 @@ export async function claimInvitation(input: ClaimInput): Promise<ClaimResult> {
 
   const { token, password } = parsed.data;
 
-  const invitation = await lookupUnusedInvitation(token);
-  if (!invitation) return { ok: false, reason: "expired_or_used" };
-
   // Hash the password with Better Auth's own hasher so the sign-in step
   // below produces the same envelope shape it would recognize on a normal
   // login. This is the same hasher `sign-up` and `setPassword` use
-  // internally.
+  // internally. Hashing scrypt-once outside the transaction keeps the
+  // transaction short.
   const passwordHash = await hashPassword(password);
 
-  const [existingAccount] = await db
-    .select({ id: account.id })
-    .from(account)
-    .where(
-      and(
-        eq(account.userId, invitation.userId),
-        eq(account.providerId, "credential"),
-      ),
-    )
-    .limit(1);
+  const invitation = await db.transaction(async (tx) => {
+    const claimed = await claimUnusedInvitation(token, tx);
+    if (!claimed) return null;
 
-  if (existingAccount) {
-    await db
-      .update(account)
-      .set({ password: passwordHash, updatedAt: new Date() })
-      .where(eq(account.id, existingAccount.id));
-  } else {
-    await db.insert(account).values({
-      id: crypto.randomUUID(),
-      accountId: invitation.userId,
-      providerId: "credential",
-      userId: invitation.userId,
-      password: passwordHash,
-    });
-  }
+    const [existingAccount] = await tx
+      .select({ id: account.id })
+      .from(account)
+      .where(
+        and(
+          eq(account.userId, claimed.userId),
+          eq(account.providerId, "credential"),
+        ),
+      )
+      .limit(1);
 
-  await markInvitationUsed(invitation.id);
+    if (existingAccount) {
+      await tx
+        .update(account)
+        .set({ password: passwordHash, updatedAt: new Date() })
+        .where(eq(account.id, existingAccount.id));
+    } else {
+      await tx.insert(account).values({
+        id: crypto.randomUUID(),
+        accountId: claimed.userId,
+        providerId: "credential",
+        userId: claimed.userId,
+        password: passwordHash,
+      });
+    }
+
+    return claimed;
+  });
+
+  if (!invitation) return { ok: false, reason: "expired_or_used" };
 
   // Sign the invitee in. `nextCookies()` (last in the plugin array in
   // lib/auth.ts) makes the Set-Cookie header returned by signInEmail

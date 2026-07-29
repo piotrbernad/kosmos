@@ -1,8 +1,12 @@
 import "server-only";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { adminInvitation, user } from "@/lib/db/schema";
 import { generateRawToken, hashToken } from "./tokens";
+
+type Db = typeof db;
+type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+type DbOrTx = Db | Tx;
 
 export { generateRawToken, hashToken } from "./tokens";
 
@@ -168,4 +172,59 @@ export async function markInvitationUsed(id: string): Promise<void> {
     .update(adminInvitation)
     .set({ usedAt: new Date() })
     .where(eq(adminInvitation.id, id));
+}
+
+/**
+ * Atomically consume an unused, unexpired invitation. Unlike
+ * `lookupUnusedInvitation` + `markInvitationUsed`, this cannot race —
+ * the `WHERE used_at IS NULL AND expires_at > now()` guard lives inside
+ * the same UPDATE that sets `used_at`, and only the winner of a concurrent
+ * claim gets a `RETURNING` row.
+ *
+ * Accepts a `DbOrTx` so the caller can bundle this consume with the password
+ * write in a single transaction — if the password write fails, the whole
+ * transaction rolls back and the invitation is NOT consumed.
+ *
+ * Returns the invitation + invitee identity on the winning claim; `null` for
+ * every other outcome (bad token, expired, already used, unknown user).
+ */
+export async function claimUnusedInvitation(
+  rawToken: string,
+  runner: DbOrTx = db,
+): Promise<UnusedInvitation | null> {
+  if (!rawToken || typeof rawToken !== "string") return null;
+  const tokenHash = hashToken(rawToken);
+  const now = new Date();
+
+  const [claimed] = await runner
+    .update(adminInvitation)
+    .set({ usedAt: now })
+    .where(
+      and(
+        eq(adminInvitation.tokenHash, tokenHash),
+        isNull(adminInvitation.usedAt),
+        gt(adminInvitation.expiresAt, sql`now()`),
+      ),
+    )
+    .returning({
+      id: adminInvitation.id,
+      userId: adminInvitation.userId,
+    });
+
+  if (!claimed) return null;
+
+  const [invitee] = await runner
+    .select({ email: user.email, name: user.name })
+    .from(user)
+    .where(eq(user.id, claimed.userId))
+    .limit(1);
+
+  if (!invitee) return null;
+
+  return {
+    id: claimed.id,
+    userId: claimed.userId,
+    email: invitee.email,
+    name: invitee.name,
+  };
 }
