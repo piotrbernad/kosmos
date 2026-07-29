@@ -66,26 +66,20 @@ export function StatusPicker({
   };
 
   return (
-    <label
-      className="stack"
-      style={{ gap: 4, alignItems: "flex-end" }}
+    <div
+      style={{ width: 210, flex: "none" }}
       data-testid="status-picker-wrapper"
     >
-      <span className="muted" style={{ fontSize: 12 }}>
+      <label htmlFor="status-picker" style={{ marginBottom: 8 }}>
         Status
-      </span>
+      </label>
       <select
+        id="status-picker"
         data-testid="status-picker"
         value={status}
         disabled={pending}
         onChange={(e) => change(e.target.value as IssueStatus)}
-        style={{
-          padding: "6px 10px",
-          borderRadius: 8,
-          border: "1px solid var(--border)",
-          background: "#fff",
-          font: "inherit",
-        }}
+        style={{ height: 46, fontWeight: 600, cursor: "pointer" }}
       >
         {OPTIONS.map((o) => (
           <option key={o.value} value={o.value}>
@@ -93,6 +87,6 @@ export function StatusPicker({
           </option>
         ))}
       </select>
-    </label>
+    </div>
   );
 }

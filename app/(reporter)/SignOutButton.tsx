@@ -7,7 +7,7 @@ export function SignOutButton() {
   const router = useRouter();
   return (
     <button
-      className="btn"
+      className="btn btn-ghost"
       onClick={async () => {
         await authClient.signOut();
         router.push("/logowanie");

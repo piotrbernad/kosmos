@@ -21,36 +21,46 @@ export default async function ReporterIssuesPage() {
       </div>
 
       {issues.length === 0 ? (
-        <div className="card empty" data-testid="empty-issues">
-          <p>Nie masz jeszcze żadnych zgłoszeń.</p>
-          <p className="muted">
-            Kliknij <strong>Nowe zgłoszenie</strong>, żeby zgłosić problem.
+        <div className="empty" data-testid="empty-issues">
+          <div style={{ fontSize: 22, fontWeight: 700, color: "var(--fg)" }}>
+            Brak zgłoszeń
+          </div>
+          <p className="muted" style={{ margin: "10px 0 24px" }}>
+            Nie masz jeszcze żadnych zgłoszeń. Opisz problem — odpowiemy w
+            panelu.
           </p>
+          <Link href="/zgloszenia/nowe" className="btn btn-primary">
+            Utwórz pierwsze zgłoszenie
+          </Link>
         </div>
       ) : (
-        <ul className="stack" data-testid="issue-list" style={{ listStyle: "none", padding: 0 }}>
+        <ul
+          className="stack"
+          data-testid="issue-list"
+          style={{ listStyle: "none", padding: 0, gap: 14 }}
+        >
           {issues.map((i) => (
             <li key={i.id}>
               <Link
                 href={`/zgloszenia/${i.id}`}
-                className="card issue-card"
+                className="issue-card"
                 data-testid={`issue-row-${i.id}`}
-                style={{ display: "block", textDecoration: "none" }}
               >
-                <div className="row-between" style={{ alignItems: "flex-start", gap: 16 }}>
-                  <div className="stack" style={{ gap: 6 }}>
-                    <h2 style={{ margin: 0 }}>{i.title}</h2>
-                    <p className="muted" style={{ margin: 0 }}>
-                      Utworzono {formatDateTime(i.createdAt)}
-                      {i.attachmentCount > 0
-                        ? ` · ${i.attachmentCount} załącznik${
-                            i.attachmentCount === 1 ? "" : "i"
-                          }`
-                        : ""}
-                    </p>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="title">{i.title}</div>
+                  <div className="meta">
+                    Utworzono {formatDateTime(i.createdAt)}
+                    {i.attachmentCount > 0
+                      ? ` · ${i.attachmentCount} załącznik${
+                          i.attachmentCount === 1 ? "" : "i"
+                        }`
+                      : ""}
                   </div>
-                  <StatusBadge status={i.status} />
                 </div>
+                <StatusBadge status={i.status} />
+                <span className="issue-arrow" aria-hidden="true">
+                  →
+                </span>
               </Link>
             </li>
           ))}
