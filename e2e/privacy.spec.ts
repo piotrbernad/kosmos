@@ -98,6 +98,33 @@ test("plain user hitting /admin/zgloszenia/<id> gets 404", async ({ browser }) =
   }
 });
 
+test("/aktywacja without a token returns 404", async ({ browser }) => {
+  // Phase 6 privacy addendum: the claim page must not leak the fact that
+  // the route exists to an unsolicited GET. Same 404 as any other unknown
+  // path.
+  const ctx = await browser.newContext();
+  try {
+    const p = await ctx.newPage();
+    const res = await p.goto("/aktywacja");
+    expect(res?.status()).toBe(404);
+    await expect(p.locator("body")).not.toContainText(/aktywacja konta/i);
+  } finally {
+    await ctx.close();
+  }
+});
+
+test("/aktywacja with a random garbage token returns 404", async ({ browser }) => {
+  const ctx = await browser.newContext();
+  try {
+    const p = await ctx.newPage();
+    const res = await p.goto("/aktywacja?token=this-is-not-a-real-token");
+    expect(res?.status()).toBe(404);
+    await expect(p.locator("body")).not.toContainText(/aktywacja konta/i);
+  } finally {
+    await ctx.close();
+  }
+});
+
 test("reporter cannot open another reporter's edit page", async ({ browser }) => {
   // Phase 5 lock: `/zgloszenia/[id]/edytuj` runs through the same
   // ownership predicate as the detail page — a foreign id 404s the
