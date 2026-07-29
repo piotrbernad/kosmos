@@ -3,8 +3,10 @@ import {
   AddCommentSchema,
   ChangeStatusSchema,
   CreateIssueSchema,
+  EditIssueSchema,
   EventPayloadSchema,
   IssueIdSchema,
+  ResolveSchema,
 } from "./validators";
 
 describe("CreateIssueSchema", () => {
@@ -236,6 +238,127 @@ describe("AddCommentSchema", () => {
     const r = AddCommentSchema.safeParse({
       issueId: "foo",
       body: "coś",
+    });
+    expect(r.success).toBe(false);
+  });
+});
+
+describe("ResolveSchema", () => {
+  const validId = "11111111-1111-4111-8111-111111111111";
+  const validTs = new Date().toISOString();
+
+  it("accepts a valid body + id + timestamp", () => {
+    const r = ResolveSchema.safeParse({
+      id: validId,
+      body: "Wdrożono poprawkę i przetestowano.",
+      expectedUpdatedAt: validTs,
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("rejects a body below the 10-char floor", () => {
+    const r = ResolveSchema.safeParse({
+      id: validId,
+      body: "za krótkie",
+      expectedUpdatedAt: validTs,
+    });
+    // "za krótkie" is 10 chars — accepted; use something shorter
+    expect(r.success).toBe(true);
+    const r2 = ResolveSchema.safeParse({
+      id: validId,
+      body: "za mało",
+      expectedUpdatedAt: validTs,
+    });
+    expect(r2.success).toBe(false);
+  });
+
+  it("rejects an all-whitespace body (trimmed to empty)", () => {
+    const r = ResolveSchema.safeParse({
+      id: validId,
+      body: "                                        ",
+      expectedUpdatedAt: validTs,
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects a body above the 2000-char ceiling", () => {
+    const r = ResolveSchema.safeParse({
+      id: validId,
+      body: "x".repeat(2001),
+      expectedUpdatedAt: validTs,
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects a missing expectedUpdatedAt", () => {
+    const r = ResolveSchema.safeParse({
+      id: validId,
+      body: "wystarczająco długie wyjaśnienie",
+      expectedUpdatedAt: "",
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects a garbage id", () => {
+    const r = ResolveSchema.safeParse({
+      id: "not-a-uuid",
+      body: "wystarczająco długie wyjaśnienie",
+      expectedUpdatedAt: validTs,
+    });
+    expect(r.success).toBe(false);
+  });
+});
+
+describe("EditIssueSchema", () => {
+  const validId = "11111111-1111-4111-8111-111111111111";
+  const validTs = new Date().toISOString();
+
+  it("accepts a valid edit payload", () => {
+    const r = EditIssueSchema.safeParse({
+      id: validId,
+      title: "Nowy tytuł",
+      description: "Nowy opis.",
+      expectedUpdatedAt: validTs,
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("rejects an oversize title", () => {
+    const r = EditIssueSchema.safeParse({
+      id: validId,
+      title: "a".repeat(201),
+      description: "opis",
+      expectedUpdatedAt: validTs,
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects an empty description", () => {
+    const r = EditIssueSchema.safeParse({
+      id: validId,
+      title: "tytuł",
+      description: "",
+      expectedUpdatedAt: validTs,
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects a missing expectedUpdatedAt", () => {
+    const r = EditIssueSchema.safeParse({
+      id: validId,
+      title: "tytuł",
+      description: "opis",
+      expectedUpdatedAt: "",
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects a garbage id", () => {
+    const r = EditIssueSchema.safeParse({
+      id: "foo",
+      title: "tytuł",
+      description: "opis",
+      expectedUpdatedAt: validTs,
     });
     expect(r.success).toBe(false);
   });

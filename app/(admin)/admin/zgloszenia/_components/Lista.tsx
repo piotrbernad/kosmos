@@ -148,8 +148,7 @@ function Row({
               type="button"
               className="btn"
               data-testid={`lista-row-${card.id}-resolve`}
-              disabled
-              title="Rozwiązanie wymaga wpisania krótkiego wyjaśnienia — dostępne wkrótce."
+              disabled={isPending}
               onClick={() => resolveDialog.open(card.id, card.updatedAt)}
               style={{ padding: "4px 10px", fontSize: 13 }}
             >

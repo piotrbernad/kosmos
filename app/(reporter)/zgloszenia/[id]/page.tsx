@@ -35,7 +35,18 @@ export default async function ReporterIssueDetailPage(props: {
               Utworzono {formatDateTime(issue.createdAt)}
             </p>
           </div>
-          <StatusBadge status={issue.status} />
+          <div className="row" style={{ gap: 12, alignItems: "center" }}>
+            {issue.status !== "rozwiazane" && (
+              <Link
+                href={`/zgloszenia/${issue.id}/edytuj`}
+                className="btn"
+                data-testid="edit-issue-link"
+              >
+                Edytuj
+              </Link>
+            )}
+            <StatusBadge status={issue.status} />
+          </div>
         </div>
       </div>
 

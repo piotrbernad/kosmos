@@ -40,12 +40,10 @@ export function StatusPicker({
   const change = (to: IssueStatus) => {
     if (to === status) return;
     if (to === "rozwiazane") {
-      // Route through the dialog (Phase 5). Present but disabled here
-      // so the intent is legible even before the dialog itself lands.
+      // Route through the resolution dialog. Cancel is a plain state
+      // clear on the dialog, so the picker's `value` stays on `status`
+      // (React controlled select) — nothing to revert here.
       dialog.open(issueId, expectedUpdatedAt);
-      toast.message(
-        "Rozwiązanie wymaga wpisania krótkiego wyjaśnienia — dostępne wkrótce.",
-      );
       return;
     }
     startTransition(async () => {
@@ -90,9 +88,8 @@ export function StatusPicker({
         }}
       >
         {OPTIONS.map((o) => (
-          <option key={o.value} value={o.value} disabled={o.value === "rozwiazane"}>
+          <option key={o.value} value={o.value}>
             {o.label}
-            {o.value === "rozwiazane" ? " (wkrótce)" : ""}
           </option>
         ))}
       </select>

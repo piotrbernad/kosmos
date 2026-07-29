@@ -1,7 +1,7 @@
 "use server";
 
 import type { ZodIssue } from "zod";
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { requireAdmin, requireUser } from "@/lib/dal";
 import { db } from "@/lib/db/client";
 import { issues, issueEvents, issueAttachments } from "@/lib/db/schema";
@@ -10,15 +10,18 @@ import {
   AddCommentSchema,
   ChangeStatusSchema,
   CreateIssueSchema,
+  EditIssueSchema,
+  ResolveSchema,
   type AddCommentInput,
   type ChangeStatusInput,
+  type ResolveInput,
 } from "./validators";
 import {
   validateAttachments,
   type AllowedContentType,
   ALLOWED_CONTENT_TYPES,
 } from "@/lib/attachments/validators";
-import { put as blobPut, buildKey } from "@/lib/attachments/store";
+import { put as blobPut, del as blobDel, buildKey } from "@/lib/attachments/store";
 
 /**
  * Discriminated result types. Expected failures (`invalid`, ...) return an
@@ -333,4 +336,311 @@ export async function addComment(
   });
 
   return { ok: true, eventId };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5 — resolution + edit + terminal-state lock.
+// ---------------------------------------------------------------------------
+
+export type ResolveIssueResult =
+  | { ok: true; updatedAt: string }
+  | { ok: false; reason: "conflict" | "gone" | "invalid" };
+
+/**
+ * Admin-only. Moves an issue to `rozwiazane` and, in the same transaction,
+ * appends a `resolution` event with the mandatory body. Concurrency is
+ * gated on both the `updated_at` token and `status <> 'rozwiazane'` so a
+ * concurrent resolution or a stale card returns `conflict`.
+ *
+ * Same millisecond-precision date_trunc predicate as `changeIssueStatus`
+ * — Postgres timestamps have microsecond precision, but the client's
+ * copy of the token round-tripped through an ISO string, so a direct
+ * `eq` on the raw column would never match.
+ */
+export async function resolveIssue(
+  input: ResolveInput,
+): Promise<ResolveIssueResult> {
+  const parsed = ResolveSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, reason: "invalid" };
+
+  const me = await requireAdmin();
+  const { id, body, expectedUpdatedAt } = parsed.data;
+  const expected = new Date(expectedUpdatedAt);
+  if (Number.isNaN(expected.getTime())) {
+    return { ok: false, reason: "invalid" };
+  }
+
+  return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ status: issues.status })
+      .from(issues)
+      .where(eq(issues.id, id))
+      .limit(1);
+
+    if (!current) return { ok: false, reason: "gone" } as const;
+
+    const [row] = await tx
+      .update(issues)
+      .set({ status: "rozwiazane", updatedAt: sql`now()` })
+      .where(
+        and(
+          eq(issues.id, id),
+          sql`date_trunc('milliseconds', ${issues.updatedAt}) = date_trunc('milliseconds', ${expected}::timestamptz)`,
+          ne(issues.status, "rozwiazane"),
+        ),
+      )
+      .returning({ updatedAt: issues.updatedAt });
+
+    if (!row) return { ok: false, reason: "conflict" } as const;
+
+    await tx.insert(issueEvents).values({
+      issueId: id,
+      actorId: me.id,
+      kind: "resolution",
+      payload: { kind: "resolution", body },
+    });
+
+    return {
+      ok: true as const,
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  });
+}
+
+export type EditIssueResult =
+  | { ok: true; id: string; rejected?: Array<{ name: string; message: string }> }
+  | { ok: false; reason: "invalid"; issues: ZodIssue[] }
+  | { ok: false; reason: "locked" | "gone" | "conflict" }
+  | {
+      ok: false;
+      reason: "attachment_rejected";
+      rejected: Array<{ name: string; message: string }>;
+    };
+
+/**
+ * Reporter-only edit. Callers must own the issue (admins editing isn't
+ * a PRD path — they use comments and resolution). Guards:
+ *
+ *   • Status must not be `rozwiazane` → `locked`.
+ *   • `expectedUpdatedAt` must match the current row (millisecond
+ *     precision, same predicate as the status actions) → `conflict`
+ *     on stale.
+ *
+ * `formData` carries `title`, `description`, `expectedUpdatedAt`, plus:
+ *   • `remove[]` — repeated attachment ids to delete.
+ *   • `attachment[]` — new files to add.
+ *
+ * Attachments are validated with the same rules as create; the count
+ * limit accounts for the surviving-after-removal set. Blobs for
+ * removed attachments are deleted *after* the DB transaction commits,
+ * so an interrupted delete leaves orphan blobs (cheap) rather than
+ * missing DB rows pointing to nothing (bad).
+ */
+export async function editIssue(
+  formData: FormData,
+): Promise<EditIssueResult> {
+  const parsed = EditIssueSchema.safeParse({
+    id: formData.get("id"),
+    title: formData.get("title"),
+    description: formData.get("description"),
+    expectedUpdatedAt: formData.get("expectedUpdatedAt"),
+  });
+
+  if (!parsed.success) {
+    return { ok: false, reason: "invalid", issues: parsed.error.issues };
+  }
+
+  const me = await requireUser();
+  const { id, title, description, expectedUpdatedAt } = parsed.data;
+
+  const expected = new Date(expectedUpdatedAt);
+  if (Number.isNaN(expected.getTime())) {
+    return { ok: false, reason: "invalid", issues: [] };
+  }
+
+  // Ownership + lock check up front, before we do any blob work.
+  // Admins are not part of the edit path — only the reporter edits.
+  const ownership =
+    me.role === "admin"
+      ? eq(issues.id, id)
+      : and(eq(issues.id, id), eq(issues.reporterId, me.id));
+
+  const [current] = await db
+    .select({
+      status: issues.status,
+      title: issues.title,
+      description: issues.description,
+    })
+    .from(issues)
+    .where(ownership)
+    .limit(1);
+
+  if (!current) return { ok: false, reason: "gone" };
+  if (current.status === "rozwiazane") return { ok: false, reason: "locked" };
+
+  // Collect FormData bits: removals + new files.
+  const removeIds = formData
+    .getAll("remove[]")
+    .filter((v): v is string => typeof v === "string" && v.length > 0);
+
+  // Fetch existing attachments so we can enforce the 5-cap after removals.
+  const existing = await db
+    .select({
+      id: issueAttachments.id,
+      blobPathname: issueAttachments.blobPathname,
+    })
+    .from(issueAttachments)
+    .where(eq(issueAttachments.issueId, id));
+
+  const toRemove = existing.filter((a) => removeIds.includes(a.id));
+  const surviving = existing.filter((a) => !removeIds.includes(a.id));
+
+  // Now validate new files.
+  const rawFiles = formData.getAll("attachment[]");
+  const files: File[] = [];
+  for (const entry of rawFiles) {
+    if (entry instanceof File && entry.size > 0) files.push(entry);
+  }
+
+  const { accepted, rejected } = validateAttachments(
+    files.map((f) => ({ name: f.name, size: f.size, type: f.type })),
+    surviving.length,
+  );
+
+  // If the reporter tried to upload but nothing survived validation,
+  // bail without touching the DB so the text edits are preserved for
+  // a retry.
+  if (files.length > 0 && accepted.length === 0) {
+    return {
+      ok: false,
+      reason: "attachment_rejected",
+      rejected: rejected.map((r) => ({ name: r.name, message: r.message })),
+    };
+  }
+
+  // Upload accepted new blobs before the transaction — same reasoning
+  // as `createIssue`: rollback leaves at most orphan blobs, not
+  // dangling DB rows.
+  const acceptedFiles: File[] = [];
+  const remainingList = [...files];
+  for (const a of accepted) {
+    const idx = remainingList.findIndex(
+      (f) => f.name === a.name && f.size === a.size && f.type === a.type,
+    );
+    if (idx !== -1) {
+      acceptedFiles.push(remainingList[idx]);
+      remainingList.splice(idx, 1);
+    }
+  }
+
+  type PreparedAttachment = {
+    id: string;
+    blobUrl: string;
+    blobPathname: string;
+    filename: string;
+    contentType: AllowedContentType;
+    sizeBytes: number;
+  };
+
+  const uploaded: PreparedAttachment[] = [];
+  for (const file of acceptedFiles) {
+    if (!isAllowedContentType(file.type)) continue;
+    const key = buildKey(id, file.type);
+    const body = Buffer.from(await file.arrayBuffer());
+    const res = await blobPut(key, body, file.type);
+    uploaded.push({
+      id: crypto.randomUUID(),
+      blobUrl: res.url,
+      blobPathname: res.pathname,
+      filename: file.name,
+      contentType: file.type,
+      sizeBytes: file.size,
+    });
+  }
+
+  const changedFields: Array<"title" | "description" | "attachments"> = [];
+  if (current.title !== title) changedFields.push("title");
+  if (current.description !== description) changedFields.push("description");
+  if (toRemove.length > 0 || uploaded.length > 0) changedFields.push("attachments");
+
+  // No-op edits still succeed but skip the feed row and the updated_at bump.
+  if (changedFields.length === 0) {
+    return { ok: true, id };
+  }
+
+  const txResult = await db.transaction(async (tx) => {
+    // Concurrency guard: recheck updated_at inside the transaction. If
+    // someone else edited the issue between our read and this write,
+    // return `conflict` and let the caller re-read.
+    const [row] = await tx
+      .update(issues)
+      .set({
+        title,
+        description,
+        updatedAt: sql`now()`,
+      })
+      .where(
+        and(
+          eq(issues.id, id),
+          sql`date_trunc('milliseconds', ${issues.updatedAt}) = date_trunc('milliseconds', ${expected}::timestamptz)`,
+          ne(issues.status, "rozwiazane"),
+        ),
+      )
+      .returning({ updatedAt: issues.updatedAt });
+
+    if (!row) return { ok: false as const, reason: "conflict" as const };
+
+    if (toRemove.length > 0) {
+      await tx
+        .delete(issueAttachments)
+        .where(
+          and(
+            eq(issueAttachments.issueId, id),
+            inArray(
+              issueAttachments.id,
+              toRemove.map((a) => a.id),
+            ),
+          ),
+        );
+    }
+
+    if (uploaded.length > 0) {
+      await tx.insert(issueAttachments).values(
+        uploaded.map((u) => ({
+          id: u.id,
+          issueId: id,
+          blobUrl: u.blobUrl,
+          blobPathname: u.blobPathname,
+          filename: u.filename,
+          contentType: u.contentType,
+          sizeBytes: u.sizeBytes,
+        })),
+      );
+    }
+
+    await tx.insert(issueEvents).values({
+      issueId: id,
+      actorId: me.id,
+      kind: "edit",
+      payload: { kind: "edit", fields: changedFields },
+    });
+
+    return { ok: true as const };
+  });
+
+  if (!txResult.ok) return txResult;
+
+  // Post-commit: delete removed blobs. Best-effort; store.del() swallows
+  // its own errors.
+  for (const a of toRemove) {
+    await blobDel(a.blobPathname);
+  }
+
+  return {
+    ok: true,
+    id,
+    rejected: rejected.length
+      ? rejected.map((r) => ({ name: r.name, message: r.message }))
+      : undefined,
+  };
 }

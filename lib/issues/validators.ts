@@ -96,3 +96,37 @@ export const AddCommentSchema = z.object({
 });
 
 export type AddCommentInput = z.infer<typeof AddCommentSchema>;
+
+/**
+ * Resolution input — 10..2000 char body plus an `expectedUpdatedAt` for
+ * optimistic-concurrency. The body is mandatory at the type level so a
+ * client cannot skip it (per PRD: "no path to Rozwiązane skips the
+ * explanation").
+ */
+export const ResolveSchema = z.object({
+  id: IssueIdSchema,
+  body: trimmed(10, 2000, "Rozwiązanie"),
+  expectedUpdatedAt: z
+    .string({ error: "Brak znacznika czasu aktualizacji." })
+    .min(1, "Brak znacznika czasu aktualizacji."),
+});
+
+export type ResolveInput = z.infer<typeof ResolveSchema>;
+
+/**
+ * Reporter's edit form. Title + description reuse the same limits as
+ * create; attachments are handled out-of-band via FormData because file
+ * objects don't survive JSON serialization. The `removeAttachmentIds`
+ * list is a string of comma-separated ids so it round-trips as a plain
+ * FormData field.
+ */
+export const EditIssueSchema = z.object({
+  id: IssueIdSchema,
+  title: trimmed(3, 200, "Tytuł"),
+  description: trimmed(1, 5000, "Opis"),
+  expectedUpdatedAt: z
+    .string({ error: "Brak znacznika czasu aktualizacji." })
+    .min(1, "Brak znacznika czasu aktualizacji."),
+});
+
+export type EditIssueInput = z.infer<typeof EditIssueSchema>;

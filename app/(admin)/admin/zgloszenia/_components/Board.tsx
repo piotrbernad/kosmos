@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import type { BoardCard } from "@/lib/issues/dto";
 import type { IssueStatus } from "@/lib/db/schema";
@@ -13,9 +14,17 @@ const COLUMNS: { status: IssueStatus; label: string }[] = [
 ];
 
 /**
+ * Cap on the number of resolved cards rendered up front in the board's
+ * `Rozwiązane` column. Anything past this is hidden behind
+ * "Pokaż pozostałe" so a queue with hundreds of closed issues doesn't
+ * blow up the layout. 20 per the outline's open-questions default.
+ */
+export const RESOLVED_INITIAL_CAP = 20;
+
+/**
  * Three-column board keyed on status. Cards carry their own action
- * buttons for non-resolving transitions; resolving is present but
- * disabled and tooltipped, wired up in Phase 5.
+ * buttons for non-resolving transitions; the "Rozwiąż" button always
+ * goes through the shared `ResolutionDialogProvider`.
  *
  * Drag-and-drop is deliberately not used — see the TDD:
  * "Drag-and-drop is not used. Cards carry two action buttons."
@@ -77,6 +86,12 @@ export function Board({
                 <p className="muted" style={{ fontSize: 13, padding: "8px 6px" }}>
                   Brak zgłoszeń.
                 </p>
+              ) : status === "rozwiazane" ? (
+                <ResolvedColumnBody
+                  cards={cards}
+                  advance={advance}
+                  isPending={isPending}
+                />
               ) : (
                 cards.map((c) => (
                   <IssueCard
@@ -92,6 +107,56 @@ export function Board({
         );
       })}
     </div>
+  );
+}
+
+/**
+ * Renders the `Rozwiązane` column body with a "show more" affordance
+ * once the list grows past `RESOLVED_INITIAL_CAP`. Local state — no
+ * URL/cookie persistence — because the queue view already cookies its
+ * board/list choice; adding another key here is more surface than the
+ * value.
+ */
+function ResolvedColumnBody({
+  cards,
+  advance,
+  isPending,
+}: {
+  cards: BoardCard[];
+  advance: (
+    id: string,
+    expectedUpdatedAt: string,
+    to: Exclude<IssueStatus, "rozwiazane">,
+  ) => Promise<void>;
+  isPending: (id: string) => boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const cap = RESOLVED_INITIAL_CAP;
+  const hidden = Math.max(0, cards.length - cap);
+  const visible = expanded ? cards : cards.slice(0, cap);
+
+  return (
+    <>
+      {visible.map((c) => (
+        <IssueCard
+          key={c.id}
+          card={c}
+          advance={advance}
+          isPending={isPending(c.id)}
+        />
+      ))}
+      {hidden > 0 && !expanded && (
+        <button
+          type="button"
+          className="btn"
+          data-testid="board-resolved-show-more"
+          onClick={() => setExpanded(true)}
+          style={{ padding: "6px 10px", fontSize: 13 }}
+        >
+          Pokaż pozostałe ({hidden})
+        </button>
+      )}
+    </>
   );
 }
 
@@ -168,9 +233,7 @@ function IssueCard({
               type="button"
               className="btn"
               data-testid={`board-card-${card.id}-resolve`}
-              // Enabled in Phase 5; kept present with an explanatory title now.
-              disabled
-              title="Rozwiązanie wymaga wpisania krótkiego wyjaśnienia — dostępne wkrótce."
+              disabled={isPending}
               onClick={() => resolveDialog.open(card.id, card.updatedAt)}
               style={{ padding: "4px 10px", fontSize: 13 }}
             >

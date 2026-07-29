@@ -1,21 +1,18 @@
 "use client";
 
 import { createContext, useCallback, useContext, useState } from "react";
+import { ResolutionDialog } from "./ResolutionDialog";
 
 /**
- * Stub provider for the resolution dialog. Phase 4 wires the *plumbing*
- * — every "Rozwiąż" button on the board / list / detail page goes
- * through `openResolutionDialog(id, updatedAt)` — but there is no
- * dialog UI yet. The actual RHF+Zod form and the `resolveIssue`
- * server-action call land in Phase 5.
- *
- * Keeping the provider here (rather than inlining a `no-op` on the
- * buttons) means Phase 5 only has to swap the body — the call sites
- * already know how to trigger it.
+ * Context + provider for the shared resolution dialog. Every "Rozwiąż"
+ * button — board card, list row, admin detail page — calls
+ * `openResolutionDialog(id, expectedUpdatedAt)`, which arms the dialog.
+ * The dialog itself renders inside the provider so board and list share
+ * one instance, and cancelling never mutates the underlying card.
  */
 export type ResolutionDialogContextValue = {
   open: (id: string, expectedUpdatedAt: string) => void;
-  /** Whether a target has been armed — used by Phase 5's dialog. */
+  /** Whether a target has been armed — used by the dialog. */
   target: { id: string; expectedUpdatedAt: string } | null;
   close: () => void;
 };
@@ -36,7 +33,7 @@ export function ResolutionDialogProvider({ children }: { children: React.ReactNo
   return (
     <Ctx.Provider value={{ open, target, close }}>
       {children}
-      {/* Phase 5 renders <ResolutionDialog /> here. */}
+      <ResolutionDialog />
     </Ctx.Provider>
   );
 }

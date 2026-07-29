@@ -97,3 +97,33 @@ test("plain user hitting /admin/zgloszenia/<id> gets 404", async ({ browser }) =
     await ctx.close();
   }
 });
+
+test("reporter cannot open another reporter's edit page", async ({ browser }) => {
+  // Phase 5 lock: `/zgloszenia/[id]/edytuj` runs through the same
+  // ownership predicate as the detail page — a foreign id 404s the
+  // same as a missing one.
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  try {
+    await registerInContext(ctxA, "editowner");
+    await registerInContext(ctxB, "editstranger");
+    const pageA = await ctxA.newPage();
+    await pageA.goto("/zgloszenia/nowe");
+    await pageA.getByLabel("Tytuł").fill("Prywatna edycja");
+    await pageA.getByLabel("Opis").fill("Nikt inny nie może edytować.");
+    await pageA.getByRole("button", { name: "Utwórz zgłoszenie" }).click();
+    await pageA.waitForURL(/\/zgloszenia\/[0-9a-f-]{36}$/);
+    const issueId = pageA.url().match(/\/zgloszenia\/([0-9a-f-]{36})/)?.[1];
+    expect(issueId).toBeTruthy();
+
+    const pageB = await ctxB.newPage();
+    const response = await pageB.goto(`/zgloszenia/${issueId}/edytuj`);
+    expect(response?.status(), "not-found status").toBe(404);
+    await expect(pageB.locator("body")).not.toContainText(
+      /forbidden|zabroniony/i,
+    );
+  } finally {
+    await ctxA.close();
+    await ctxB.close();
+  }
+});
