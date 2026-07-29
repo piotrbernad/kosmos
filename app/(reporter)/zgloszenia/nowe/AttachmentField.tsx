@@ -156,12 +156,16 @@ export function AttachmentField({ onChange, disabled }: AttachmentFieldProps) {
         }}
         aria-disabled={disabled}
         style={{
-          border: "1px dashed var(--border, #d0d0d0)",
-          padding: 16,
-          borderRadius: 8,
+          border: `2px dashed ${isDragOver ? "var(--primary)" : "#d8ccb8"}`,
+          padding: 26,
+          borderRadius: "var(--r-inner)",
           textAlign: "center",
           cursor: disabled ? "not-allowed" : "pointer",
-          background: isDragOver ? "#f0f7ff" : "transparent",
+          background: "var(--bg)",
+          fontSize: 15,
+          fontWeight: 600,
+          color: isDragOver ? "var(--fg)" : "var(--muted-2)",
+          transition: "border-color 0.18s ease, color 0.18s ease",
         }}
         data-testid="attachment-dropzone"
       >
@@ -220,14 +224,7 @@ export function AttachmentField({ onChange, disabled }: AttachmentFieldProps) {
           {entries.map((e) => (
             <li
               key={e.id}
-              className="card"
-              style={{
-                padding: 8,
-                width: 140,
-                display: "flex",
-                flexDirection: "column",
-                gap: 4,
-              }}
+              style={{ position: "relative", width: 140 }}
               data-testid="attachment-preview"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -236,34 +233,50 @@ export function AttachmentField({ onChange, disabled }: AttachmentFieldProps) {
                 alt={e.file.name}
                 style={{
                   width: "100%",
-                  height: 80,
+                  height: 96,
                   objectFit: "cover",
-                  borderRadius: 4,
+                  borderRadius: 16,
+                  background: "#e2d7c2",
                 }}
               />
-              <span
+              <div
                 title={e.file.name}
                 style={{
                   fontSize: 12,
+                  color: "var(--muted)",
+                  marginTop: 6,
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
                 }}
               >
                 {e.file.name}
-              </span>
-              <span className="muted" style={{ fontSize: 11 }}>
+              </div>
+              <div style={{ fontSize: 11, color: "var(--muted)" }}>
                 {humanSize(e.file.size)}
-              </span>
+              </div>
               <button
                 type="button"
-                className="btn"
                 onClick={() => removeEntry(e.id)}
-                style={{ fontSize: 12, padding: "2px 6px" }}
+                style={{
+                  position: "absolute",
+                  top: -8,
+                  right: -8,
+                  width: 26,
+                  height: 26,
+                  borderRadius: 999,
+                  border: "none",
+                  background: "var(--primary)",
+                  color: "var(--primary-fg)",
+                  display: "grid",
+                  placeItems: "center",
+                  fontSize: 14,
+                  lineHeight: 1,
+                }}
                 data-testid="attachment-remove"
                 aria-label={`Usuń załącznik ${e.file.name}`}
               >
-                Usuń
+                ×
               </button>
             </li>
           ))}

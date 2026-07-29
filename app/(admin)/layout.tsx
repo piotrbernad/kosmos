@@ -1,5 +1,6 @@
-import Link from "next/link";
 import { requireAdmin } from "@/lib/dal";
+import { KosmosLogo } from "@/app/_components/KosmosLogo";
+import { NavPill } from "@/app/_components/NavPill";
 import { SignOutButton } from "../(reporter)/SignOutButton";
 
 export default async function AdminLayout({
@@ -7,27 +8,17 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await requireAdmin();
+  await requireAdmin();
   return (
     <>
-      <header className="nav">
+      <header className="app-header">
         <div className="inner">
-          <nav className="row" style={{ gap: 8 }}>
-            <Link href="/admin/zgloszenia">Zgłoszenia</Link>
-            <span
-              className="muted"
-              style={{
-                border: "1px solid var(--border)",
-                borderRadius: 6,
-                padding: "2px 8px",
-                fontSize: 12,
-              }}
-            >
-              Admin
-            </span>
+          <KosmosLogo href="/admin/zgloszenia" />
+          <nav className="nav-pills">
+            <NavPill href="/admin/zgloszenia">Zgłoszenia</NavPill>
           </nav>
-          <div className="row" style={{ gap: 12 }}>
-            <span className="muted">{user.name}</span>
+          <div className="header-right">
+            <span className="role-chip">Administrator</span>
             <SignOutButton />
           </div>
         </div>

@@ -43,48 +43,32 @@ export function Board({
   isPending: (id: string) => boolean;
 }) {
   return (
-    <div
-      className="board"
-      data-testid="admin-board"
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(3, 1fr)",
-        gap: 12,
-        alignItems: "start",
-      }}
-    >
+    <div className="board" data-testid="admin-board">
       {COLUMNS.map(({ status, label }) => {
         const cards = byStatus(status);
         return (
           <section
             key={status}
-            className="stack"
+            className="board-col"
             data-testid={`board-column-${status}`}
-            style={{
-              background: "#f1f5f9",
-              borderRadius: 12,
-              padding: 12,
-              gap: 8,
-            }}
           >
             <header
-              className="row-between"
-              style={{ padding: "4px 6px 8px" }}
+              className="board-col-head"
               data-testid={`board-column-${status}-head`}
             >
-              <strong style={{ fontSize: 14 }}>{label}</strong>
+              <span className="col-dot" data-status={status} aria-hidden="true" />
+              <span className="col-label">{label}</span>
               <span
-                className="muted"
+                className="col-count"
                 data-testid={`board-column-${status}-count`}
-                style={{ fontSize: 12, background: "#fff", padding: "1px 8px", borderRadius: 999 }}
               >
                 {cards.length}
               </span>
             </header>
-            <div className="stack" style={{ gap: 8 }}>
+            <div className="stack" style={{ gap: 12 }}>
               {cards.length === 0 ? (
-                <p className="muted" style={{ fontSize: 13, padding: "8px 6px" }}>
-                  Brak zgłoszeń.
+                <p className="muted" style={{ fontSize: 14, padding: "8px 6px", color: "var(--faint)" }}>
+                  Brak zgłoszeń
                 </p>
               ) : status === "rozwiazane" ? (
                 <ResolvedColumnBody
@@ -148,10 +132,9 @@ function ResolvedColumnBody({
       {hidden > 0 && !expanded && (
         <button
           type="button"
-          className="btn"
+          className="btn btn-sm"
           data-testid="board-resolved-show-more"
           onClick={() => setExpanded(true)}
-          style={{ padding: "6px 10px", fontSize: 13 }}
         >
           Pokaż pozostałe ({hidden})
         </button>
@@ -178,70 +161,66 @@ function IssueCard({
 
   return (
     <article
-      className="card"
+      className="board-card"
       data-testid={`board-card-${card.id}`}
       data-status={card.status}
-      style={{
-        padding: 12,
-        background: "#fff",
-        opacity: isPending ? 0.7 : 1,
-      }}
+      style={{ opacity: isPending ? 0.7 : 1 }}
     >
-      <div className="stack" style={{ gap: 8 }}>
-        <Link
-          href={`/admin/zgloszenia/${card.id}`}
-          data-testid={`board-card-${card.id}-title`}
-          style={{ textDecoration: "none", color: "inherit", fontWeight: 500 }}
-        >
-          {card.title}
-        </Link>
-        <p className="muted" style={{ margin: 0, fontSize: 12 }}>
-          {card.reporter.name}
-          {card.attachmentCount > 0 ? ` · ${card.attachmentCount} załącznik${card.attachmentCount === 1 ? "" : "i"}` : ""}
-        </p>
-        <p className="muted" style={{ margin: 0, fontSize: 12 }}>
-          {formatDateTime(card.createdAt)}
-        </p>
+      <Link
+        href={`/admin/zgloszenia/${card.id}`}
+        data-testid={`board-card-${card.id}-title`}
+        className="bc-title"
+        style={{ display: "block" }}
+      >
+        {card.title}
+      </Link>
+      <div className="bc-meta">
+        {card.reporter.name}
+        {card.attachmentCount > 0
+          ? ` · ${card.attachmentCount} załącznik${card.attachmentCount === 1 ? "" : "i"}`
+          : ""}{" "}
+        · {formatDateTime(card.createdAt)}
+      </div>
 
-        {!isResolved && (
-          <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
-            {card.status === "nowe" && (
-              <button
-                type="button"
-                className="btn"
-                data-testid={`board-card-${card.id}-start`}
-                disabled={isPending}
-                onClick={() => advance(card.id, card.updatedAt, "w_trakcie")}
-                style={{ padding: "4px 10px", fontSize: 13 }}
-              >
-                Rozpocznij →
-              </button>
-            )}
-            {card.status === "w_trakcie" && (
-              <button
-                type="button"
-                className="btn"
-                data-testid={`board-card-${card.id}-back`}
-                disabled={isPending}
-                onClick={() => advance(card.id, card.updatedAt, "nowe")}
-                style={{ padding: "4px 10px", fontSize: 13 }}
-              >
-                Cofnij do „Nowe”
-              </button>
-            )}
+      {!isResolved && (
+        <div className="bc-actions">
+          {card.status === "nowe" && (
             <button
               type="button"
-              className="btn"
-              data-testid={`board-card-${card.id}-resolve`}
+              className="btn btn-primary btn-sm"
+              data-testid={`board-card-${card.id}-start`}
               disabled={isPending}
-              onClick={() => resolveDialog.open(card.id, card.updatedAt)}
-              style={{ padding: "4px 10px", fontSize: 13 }}
+              onClick={() => advance(card.id, card.updatedAt, "w_trakcie")}
             >
-              Rozwiąż
+              Rozpocznij →
             </button>
-          </div>
-        )}
-      </div>
+          )}
+          {card.status === "w_trakcie" && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              data-testid={`board-card-${card.id}-back`}
+              disabled={isPending}
+              onClick={() => advance(card.id, card.updatedAt, "nowe")}
+            >
+              Cofnij do „Nowe”
+            </button>
+          )}
+          <button
+            type="button"
+            className={
+              card.status === "w_trakcie"
+                ? "btn btn-success btn-sm"
+                : "btn btn-sm"
+            }
+            data-testid={`board-card-${card.id}-resolve`}
+            disabled={isPending}
+            onClick={() => resolveDialog.open(card.id, card.updatedAt)}
+          >
+            Rozwiąż
+          </button>
+        </div>
+      )}
     </article>
   );
 }

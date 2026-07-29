@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSessionUserOrNull } from "@/lib/dal";
+import { KosmosLogo } from "@/app/_components/KosmosLogo";
 
 export default async function AuthLayout({
   children,
@@ -12,5 +13,14 @@ export default async function AuthLayout({
   if (user) {
     redirect(user.role === "admin" ? "/admin/zgloszenia" : "/zgloszenia");
   }
-  return <main className="centered-card">{children}</main>;
+  return (
+    <main className="centered-card">
+      <div style={{ width: "100%", maxWidth: 452 }}>
+        <div style={{ marginBottom: 22 }}>
+          <KosmosLogo size="lg" />
+        </div>
+        {children}
+      </div>
+    </main>
+  );
 }
