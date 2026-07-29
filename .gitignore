@@ -37,3 +37,14 @@ next-env.d.ts
 
 # humanlayer
 .humanlayer/workspace.local.json
+
+# Riptide artifacts (cloud-synced)
+.humanlayer/tasks/
+
+# drizzle
+drizzle/meta
+
+# playwright / vitest
+/playwright-report
+/test-results
+/e2e/.auth

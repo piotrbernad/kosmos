@@ -1,0 +1,47 @@
+{
+  "name": "kosmos-issue-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "e2e": "playwright test",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "admin:seed": "tsx --conditions=react-server --env-file=.env.local scripts/admin-seed.ts",
+    "admin:invite": "tsx --conditions=react-server --env-file=.env.local scripts/admin-invite.ts"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "5.5.7",
+    "@vercel/blob": "2.6.1",
+    "better-auth": "1.6.25",
+    "drizzle-orm": "0.45.2",
+    "next": "16.2.12",
+    "pg": "8.22.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-hook-form": "7.83.0",
+    "server-only": "^0.0.1",
+    "sonner": "2.0.7",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.4",
+    "@eslint/eslintrc": "^3.3.6",
+    "@playwright/test": "1.62.0",
+    "@types/node": "22.10.5",
+    "@types/pg": "8.15.6",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "drizzle-kit": "0.31.10",
+    "eslint": "9.19.0",
+    "eslint-config-next": "16.2.12",
+    "tsx": "4.19.2",
+    "typescript": "5.7.3",
+    "vitest": "4.1.10"
+  }
+}
